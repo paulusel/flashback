@@ -3,9 +3,6 @@ package org.flashback.types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
-/**
- * Memo
- */
 public class Memo {
 
     private transient Integer id;
@@ -26,7 +23,6 @@ public class Memo {
         this.note = note;
         this.modified = modified;
         this.files = files;
-
     }
 
     public Integer getId() {
@@ -72,5 +68,4 @@ public class Memo {
     public void setModified(LocalDateTime modified) {
         this.modified = modified;
     }
-
 }

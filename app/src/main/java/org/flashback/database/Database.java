@@ -4,6 +4,8 @@ import java.io.Closeable;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+import org.flashback.helpers.Config;
+import org.flashback.types.AuthRequestInfo;
 import org.flashback.types.User;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -12,9 +14,6 @@ import com.zaxxer.hikari.HikariDataSource;
 public class Database implements Closeable {
 
     private static HikariDataSource ds;
-    private final static String dbName = "flashback";
-    private final static String dbUserName = "flashback";
-    private final static String password = "";
 
     private Connection conn;
 
@@ -25,9 +24,9 @@ public class Database implements Closeable {
     public static Database getDatabase() throws SQLException{
         if(ds == null) {
             HikariConfig config = new HikariConfig();
-            config.setJdbcUrl("jdbc:postgresql://localhost/" + dbName);
-            config.setUsername(dbUserName);
-            config.setPassword(password);
+            config.setJdbcUrl(Config.getDatabaseUrl());
+            config.setUsername(Config.getDatabaseUserName());
+            config.setPassword(Config.getDbpassword());
 
             config.setMaximumPoolSize(2);
             config.setConnectionTimeout(30000);
@@ -61,5 +60,9 @@ public class Database implements Closeable {
         catch(SQLException e){
             e.printStackTrace();
         }
+    }
+
+    public boolean authenticate(AuthRequestInfo authInfo) {
+        return true;
     }
 }

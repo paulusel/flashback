@@ -3,7 +3,9 @@ package org.flashback.server;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 
-import org.flashback.server.handlers.ErrorHandler;
+import org.eclipse.jetty.http.HttpStatus;
+import org.flashback.server.handlers.Handler;
+import org.flashback.types.MessageResponse;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -21,7 +23,8 @@ public class FlashbackHttpServlet extends HttpServlet {
     public void service(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         var exchange = new RequestResponsePair(req, res);
         if(!queue.offer(exchange)) {
-            ErrorHandler.handle(500, "Server Busy", exchange);
+            MessageResponse response = new MessageResponse(false, HttpStatus.SERVICE_UNAVAILABLE_503, "Server Busy");
+            Handler.sendJson(response, exchange);
             return;
         }
 

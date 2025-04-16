@@ -1,9 +1,11 @@
 package org.flashback.server;
 
+import java.io.Closeable;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-public class RequestResponsePair {
+public class RequestResponsePair implements Closeable{
     public HttpServletRequest request;
     public HttpServletResponse response;
     public RequestResponsePair(HttpServletRequest request, HttpServletResponse response) {
@@ -17,5 +19,11 @@ public class RequestResponsePair {
 
     public HttpServletResponse getResponse() {
         return response;
+    }
+
+    @Override
+    public void close() {
+        var async = request.getAsyncContext();
+        if (async != null) async.complete();
     }
 }

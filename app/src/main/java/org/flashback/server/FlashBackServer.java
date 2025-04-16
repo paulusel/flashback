@@ -1,10 +1,9 @@
 package org.flashback.server;
 
-import org.flashback.server.handlers.RootHandler;
+import org.flashback.server.handlers.RootDispatcher;
 
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -15,9 +14,11 @@ public class FlashBackServer {
 
     private final int port = 8080;
     private final int nThreads = 2;
-    private Server httpServer;
-    private BlockingQueue<RequestResponsePair> queue;
-    private ArrayList<Thread> threads;
+    private final int queueSize = 100;
+
+    private final BlockingQueue<RequestResponsePair> queue = new ArrayBlockingQueue<>(queueSize);
+    private Server httpServer = new Server(port);
+    private final ArrayList<Thread> threads = new ArrayList<>();
 
     public static FlashBackServer getServer() {
         if(server == null) {
@@ -27,10 +28,7 @@ public class FlashBackServer {
         return server;
     }
 
-    private FlashBackServer() {
-        queue = new ArrayBlockingQueue<>(100);
-        httpServer = new Server(port);
-    }
+    private FlashBackServer() {};
 
     public void startService() throws Exception{
 
@@ -40,15 +38,13 @@ public class FlashBackServer {
         httpServer.setHandler(context);
 
         for(int i = 0; i < nThreads; ++i) {
-            Thread consumer = new Thread(new RootHandler(queue));
-            threads = new ArrayList<>();
+            Thread consumer = new Thread(new RootDispatcher(queue));
             threads.add(consumer);
             consumer.start();
         }
 
         httpServer.start();
     }
-
 
     public void stopService() throws Exception{
         httpServer.stop();
