@@ -18,8 +18,7 @@ public class AuthHandler {
 
     public static void handle(RequestResponsePair exchange) {
         if(!exchange.getRequest().getHeader("Content-Type").equals("application/json")) {
-            MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "Expected JSON Data");
-            Handler.sendJson(response, exchange);
+            Handler.sendJsonExpecedError(exchange);
             return;
         }
 

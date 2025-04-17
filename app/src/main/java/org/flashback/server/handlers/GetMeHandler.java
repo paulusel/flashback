@@ -34,8 +34,7 @@ public class GetMeHandler extends Handler{
         }
         catch(DatabaseException e){
             e.printStackTrace();
-            MessageResponse response = new MessageResponse(false, HttpStatus.INTERNAL_SERVER_ERROR_500, "Server Error");
-            Handler.sendJson(response, exchange);
+            Handler.sendServerError(exchange);
         }
     }
 }

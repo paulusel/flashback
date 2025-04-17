@@ -47,4 +47,9 @@ public class Handler {
         MessageResponse response = new MessageResponse(false, HttpStatus.INTERNAL_SERVER_ERROR_500, "Internal Server Error");
         sendJson(response, exchange);
     }
+
+    public static void sendJsonExpecedError(RequestResponsePair exchange) {
+        MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "Expected JSON Data");
+        Handler.sendJson(response, exchange);
+    }
 }
