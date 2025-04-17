@@ -81,14 +81,12 @@ public class Database implements Closeable {
 
             if(user.getPassword() == null || user.getUserName() == null) return false;
 
-            String passwordHash = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
-
             PreparedStatement stmnt = conn.prepareStatement("SELECT password FROM users WHERE username = ?");
             stmnt.setString(1, user.getUserName());
             ResultSet result = stmnt.executeQuery();
+            result.next();
 
-            if(!result.next()) return false;
-            return passwordHash.equals(result.getString(1));
+            return BCrypt.checkpw(user.getPassword(), result.getString(1));
 
         }
         catch(SQLException e) {
