@@ -4,18 +4,12 @@ import org.flashback.types.MessageResponse;
 import org.flashback.types.User;
 import org.flashback.types.UserDataResponse;
 
-import java.sql.SQLException;
-
 import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.auth.Authenticator;
 import org.flashback.database.Database;
+import org.flashback.database.DatabaseException;
 import org.flashback.server.RequestResponsePair;
 
-import com.google.gson.Gson;
-
-/**
- * GetMeHandler
- */
 public class GetMeHandler extends Handler{
 
     static void handle(RequestResponsePair exchange, Database db) {
@@ -39,7 +33,7 @@ public class GetMeHandler extends Handler{
             UserDataResponse response = new UserDataResponse(true, HttpStatus.OK_200, me);
             Handler.sendJson(response, exchange);
         }
-        catch(SQLException e){
+        catch(DatabaseException e){
             e.printStackTrace();
             MessageResponse response = new MessageResponse(false, HttpStatus.INTERNAL_SERVER_ERROR_500, "Server Error");
             Handler.sendJson(response, exchange);

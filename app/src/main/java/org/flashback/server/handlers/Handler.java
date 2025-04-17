@@ -3,7 +3,6 @@ package org.flashback.server.handlers;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.apache.commons.io.function.IOStream;
 import org.eclipse.jetty.http.HttpStatus;
 
 import org.flashback.server.RequestResponsePair;
