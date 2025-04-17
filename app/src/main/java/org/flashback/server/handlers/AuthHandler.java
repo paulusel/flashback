@@ -16,7 +16,7 @@ import com.google.gson.Gson;
 
 public class AuthHandler {
 
-    public static void handle(RequestResponsePair exchange, Database db) {
+    public static void handle(RequestResponsePair exchange) {
         if(!exchange.getRequest().getHeader("Content-Type").equals("application/json")) {
             MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "Expected JSON Data");
             Handler.sendJson(response, exchange);
@@ -32,7 +32,7 @@ public class AuthHandler {
                 return;
             }
 
-            if(!db.authenticate(user)) {
+            if(!Database.authenticate(user)) {
                 MessageResponse response = new MessageResponse(false, HttpStatus.UNAUTHORIZED_401,
                     "Incorrect username or password");
                 Handler.sendJson(response, exchange);
@@ -40,7 +40,7 @@ public class AuthHandler {
             }
 
             String token = Authenticator.generateToken(user.getUserName());
-            user = db.getUser(user.getUserName());
+            user = Database.getUser(user.getUserName());
             AuthResponse response = new AuthResponse(true, HttpStatus.OK_200, token, user);
             Handler.sendJson(response, exchange);
         }

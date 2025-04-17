@@ -38,7 +38,7 @@ public class FileUploadHandler extends Handler {
         upload.setFileSizeMax(fileSizeMax);
     }
 
-    public static void handle(RequestResponsePair exchange, Database db) {
+    public static void handle(RequestResponsePair exchange) {
         if(!JakartaServletDiskFileUpload.isMultipartContent(exchange.getRequest())){
             MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "Expected multipart/form-data");
             Handler.sendJson(response, exchange);

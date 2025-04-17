@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.flashback.database.Database;
 import org.flashback.server.RequestResponsePair;
 import org.flashback.types.MessageResponse;
 
@@ -26,10 +25,7 @@ public class RootDispatcher implements Runnable {
     @Override
     public void run(){
         while (!Thread.interrupted()) {
-            try(
-                RequestResponsePair exchange = queue.take();
-                Database db = Database.getDatabase();
-            ) {
+            try( RequestResponsePair exchange = queue.take()) {
 
                 if(!exchange.getRequest().getMethod().equals("POST")) {
                     MessageResponse response = new MessageResponse(false, HttpStatus.METHOD_NOT_ALLOWED_405, "Expected POST Request");
@@ -46,7 +42,7 @@ public class RootDispatcher implements Runnable {
                     continue;
                 }
 
-                handler.handle(exchange, db);
+                handler.handle(exchange);
             }
             catch(InterruptedException e) {
                 e.printStackTrace();
@@ -59,6 +55,6 @@ public class RootDispatcher implements Runnable {
 
     @FunctionalInterface
     private interface DispatchHandler {
-        void handle(RequestResponsePair exchange, Database db);
+        void handle(RequestResponsePair exchange);
     }
 }

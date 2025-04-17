@@ -1,6 +1,5 @@
 package org.flashback.database;
 
-import java.io.Closeable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,42 +12,27 @@ import org.mindrot.jbcrypt.BCrypt;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-public class Database implements Closeable {
+public class Database {
 
     private static HikariDataSource ds;
 
-    private Connection conn;
+    static {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(Config.getDatabaseUrl());
+        config.setUsername(Config.getDatabaseUserName());
+        config.setPassword(Config.getDbpassword());
 
-    private Database(Connection conn) {
-        this.conn = conn;
+        config.setMaximumPoolSize(2);
+        config.setConnectionTimeout(30000);
+        config.setIdleTimeout(600000);
+        config.setMaxLifetime(1800000);
+
+        ds = new HikariDataSource(config);
     }
 
-    public static Database getDatabase() throws DatabaseException {
-        if(ds == null) {
-            HikariConfig config = new HikariConfig();
-            config.setJdbcUrl(Config.getDatabaseUrl());
-            config.setUsername(Config.getDatabaseUserName());
-            config.setPassword(Config.getDbpassword());
-
-            config.setMaximumPoolSize(2);
-            config.setConnectionTimeout(30000);
-            config.setIdleTimeout(600000);
-            config.setMaxLifetime(1800000);
-
-            ds = new HikariDataSource(config);
-        }
-
-        try {
-            return new Database(ds.getConnection());
-        }
-        catch(SQLException e) {
-            throw new DatabaseException(e);
-        }
-    }
-
-    public User getUser(String userId) throws DatabaseException {
+    public static User getUser(String userId) throws DatabaseException {
         // TODO: Dummy code
-        try {
+        try(Connection conn = ds.getConnection()) {
 
             var stmnt = conn.prepareStatement("SELECT username, telegram_userid FROM users WHERE username = ?");
             stmnt.setString(1, userId);
@@ -66,18 +50,8 @@ public class Database implements Closeable {
         }
     }
 
-    @Override
-    public void close() {
-        try {
-            conn.close();
-        }
-        catch(SQLException e){
-            e.printStackTrace();
-        }
-    }
-
-    public boolean authenticate(User user) throws DatabaseException {
-        try {
+    public static boolean authenticate(User user) throws DatabaseException {
+        try (Connection conn = ds.getConnection()){
 
             if(user.getPassword() == null || user.getUserName() == null) return false;
 
@@ -94,9 +68,9 @@ public class Database implements Closeable {
         }
     }
 
-    public void addNewUser(User user) throws DatabaseException {
+    public static void addNewUser(User user) throws DatabaseException {
         if(user.getUserName() == null || user.getPassword() == null) throw new DatabaseException("username or password missing");
-        try {
+        try (Connection conn = ds.getConnection()){
             String passwordHash = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
             PreparedStatement stmnt = conn.prepareStatement("INSERT INTO users (username, password, telegram_userid) VALUES (?, ?, ?)");
             stmnt.setString(1, user.getUserName());

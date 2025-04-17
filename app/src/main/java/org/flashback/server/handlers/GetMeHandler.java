@@ -12,7 +12,7 @@ import org.flashback.server.RequestResponsePair;
 
 public class GetMeHandler extends Handler{
 
-    static void handle(RequestResponsePair exchange, Database db) {
+    static void handle(RequestResponsePair exchange) {
         try {
             String username = Authenticator.authenticate(exchange.getRequest());
             if(username == null) {
@@ -21,7 +21,7 @@ public class GetMeHandler extends Handler{
                 return;
             }
 
-            User me = db.getUser(username);
+            User me = Database.getUser(username);
 
             if(me == null) {
                 MessageResponse response = new MessageResponse(false, HttpStatus.NOT_FOUND_404, "User Not Found");
@@ -29,7 +29,6 @@ public class GetMeHandler extends Handler{
                 return;
             }
 
-            me.setPassword(null);
             UserDataResponse response = new UserDataResponse(true, HttpStatus.OK_200, me);
             Handler.sendJson(response, exchange);
         }
