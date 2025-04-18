@@ -7,8 +7,8 @@ import org.flashback.types.UserDataResponse;
 import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.auth.Authenticator;
 import org.flashback.database.Database;
-import org.flashback.database.DatabaseException;
-import org.flashback.server.RequestResponsePair;
+import org.flashback.exceptions.FlashbackException;
+import org.flashback.types.RequestResponsePair;
 
 public class GetMeHandler extends Handler{
 
@@ -17,7 +17,7 @@ public class GetMeHandler extends Handler{
             String username = Authenticator.authenticate(exchange.getRequest());
             if(username == null) {
                 MessageResponse response = new MessageResponse(false, HttpStatus.UNAUTHORIZED_401, "Authentication Failed");
-                Handler.sendJson(response, exchange);
+                Handler.sendJsonResponse(response, exchange);
                 return;
             }
 
@@ -25,16 +25,15 @@ public class GetMeHandler extends Handler{
 
             if(me == null) {
                 MessageResponse response = new MessageResponse(false, HttpStatus.NOT_FOUND_404, "User Not Found");
-                Handler.sendJson(response, exchange);
+                Handler.sendJsonResponse(response, exchange);
                 return;
             }
 
             UserDataResponse response = new UserDataResponse(true, HttpStatus.OK_200, me);
-            Handler.sendJson(response, exchange);
+            Handler.sendJsonResponse(response, exchange);
         }
-        catch(DatabaseException e){
-            e.printStackTrace();
-            Handler.sendServerError(exchange);
+        catch(FlashbackException e) {
+            Handler.handleException(exchange, e);
         }
     }
 }

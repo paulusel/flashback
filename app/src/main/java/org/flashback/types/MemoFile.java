@@ -3,16 +3,14 @@ package org.flashback.types;
 public class MemoFile {
 
     private String fileId;
-    transient private String telegramFileId;
-    transient private String fileName;
     private String originalName;
+    transient private String telegramFileId;
 
     public MemoFile() {};
 
-    public MemoFile(String fileId, String telegramFileId, String fileName, String originalName){
+    public MemoFile(String fileId, String telegramFileId, String originalName){
         this.fileId = fileId;
         this.telegramFileId = telegramFileId;
-        this.fileName = fileName;
         this.originalName = originalName;
     }
 
@@ -30,14 +28,6 @@ public class MemoFile {
 
     public void setTelegramFileId(String telegramFileID) {
         this.telegramFileId = telegramFileID;
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
     }
 
     public String getOriginalName() {

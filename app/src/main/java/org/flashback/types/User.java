@@ -5,19 +5,19 @@ package org.flashback.types;
  */
 public class User {
 
-    private String userName;
+    private String username;
     private String password;
     transient private String telegramUserId;
 
     public User() {}
 
     public User(String userName) {
-        this.userName = userName;
+        this.username = userName;
     }
 
     public User(String uName, String telegram_id){
         this.telegramUserId = telegram_id;
-        this.userName = uName;
+        this.username = uName;
     }
 
     public String getTelegramUserId() {
@@ -28,12 +28,12 @@ public class User {
         this.telegramUserId = telegramUserId;
     }
 
-    public String getUserName() {
-        return userName;
+    public String getUsername() {
+        return username;
     }
 
-    public void setUserName(String userName) {
-        this.userName = userName;
+    public void setUsername(String userName) {
+        this.username = userName;
     }
 
     public String getPassword() {

@@ -1,6 +1,6 @@
 package org.flashback.server.handlers;
 
-import org.flashback.server.RequestResponsePair;
+import org.flashback.types.RequestResponsePair;
 import org.flashback.types.MessageResponse;
 import org.flashback.database.Database;
 import org.apache.commons.fileupload2.core.DiskFileItemFactory;
@@ -41,7 +41,7 @@ public class FileUploadHandler extends Handler {
     public static void handle(RequestResponsePair exchange) {
         if(!JakartaServletDiskFileUpload.isMultipartContent(exchange.getRequest())){
             MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "Expected multipart/form-data");
-            Handler.sendJson(response, exchange);
+            Handler.sendJsonResponse(response, exchange);
             return;
         }
 
@@ -77,18 +77,18 @@ public class FileUploadHandler extends Handler {
 
             if(fileCount[0] == 0) {
                 MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "No File Included");
-                Handler.sendJson(response, exchange);
+                Handler.sendJsonResponse(response, exchange);
             }
             else {
                 MessageResponse response = new MessageResponse(true, HttpStatus.OK_200, "Files Uploaded: " + fileCount[0]);
-                Handler.sendJson(response, exchange);
+                Handler.sendJsonResponse(response, exchange);
             }
             errored = false;
         }
         catch(FileUploadByteCountLimitException e){
             MessageResponse response = new MessageResponse(false, HttpStatus.PAYLOAD_TOO_LARGE_413,
                 "File Too Big. Expected Size < 20MB: [" + e.getFileName() + "]");
-            Handler.sendJson(response, exchange);
+            Handler.sendJsonResponse(response, exchange);
         }
         catch(FileUploadException e) {
             e.printStackTrace();

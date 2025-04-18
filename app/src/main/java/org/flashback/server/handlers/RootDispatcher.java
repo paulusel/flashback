@@ -4,16 +4,23 @@ import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.flashback.server.RequestResponsePair;
-import org.flashback.types.MessageResponse;
+import org.flashback.types.RequestResponsePair;
+import org.flashback.exceptions.FlashbackException;
 
 public class RootDispatcher implements Runnable {
     private static final HashMap<String, DispatchHandler> handlers = new HashMap<>();
 
     static {
-        handlers.put("getMe", GetMeHandler::handle);
-        handlers.put("uploadFile", FileUploadHandler::handle);
-        handlers.put("auth", AuthHandler::handle);
+        handlers.put("signup", SignupHandler::handle);
+        handlers.put("deleteme", DeleteAccountHandler::handle);
+        handlers.put("login", LoginHandler::handle);
+        handlers.put("getme", GetMeHandler::handle);
+        handlers.put("addnotes", AddMemoHandler::handle);
+        handlers.put("getnotes", GetMemoHandler::handle);
+        handlers.put("rmnotes", DeleteMemoHandler::handle);
+        handlers.put("upload", FileUploadHandler::handle);
+        handlers.put("rmfiles", RemoveFilesFromMemoHandler::handle);
+        handlers.put("addfiles", AddFilesToMemoHandler::handle);
     }
 
     private final BlockingQueue<RequestResponsePair> queue;
@@ -28,8 +35,7 @@ public class RootDispatcher implements Runnable {
             try( RequestResponsePair exchange = queue.take()) {
 
                 if(!exchange.getRequest().getMethod().equals("POST")) {
-                    MessageResponse response = new MessageResponse(false, HttpStatus.METHOD_NOT_ALLOWED_405, "Expected POST Request");
-                    Handler.sendJson(response, exchange);
+                    Handler.handleException(exchange, new FlashbackException(HttpStatus.METHOD_NOT_ALLOWED_405, "expected POST request"));
                     continue;
                 }
 
@@ -37,17 +43,13 @@ public class RootDispatcher implements Runnable {
                 var handler = handlers.get(path);
 
                 if(handler == null) {
-                    MessageResponse response = new MessageResponse(false, HttpStatus.NOT_FOUND_404, "API Method Not Found");
-                    Handler.sendJson(response, exchange);
+                    Handler.handleException(exchange, new FlashbackException(HttpStatus.NOT_FOUND_404, "api method not found"));
                     continue;
                 }
 
                 handler.handle(exchange);
             }
             catch(InterruptedException e) {
-                e.printStackTrace();
-            }
-            catch(Exception e) {
                 e.printStackTrace();
             }
         }

@@ -1,6 +1,7 @@
 package org.flashback.server;
 
 import org.flashback.server.handlers.RootDispatcher;
+import org.flashback.types.RequestResponsePair;
 
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.server.Server;

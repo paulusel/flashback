@@ -1,4 +1,4 @@
-package org.flashback.server;
+package org.flashback.types;
 
 import java.io.Closeable;
 
