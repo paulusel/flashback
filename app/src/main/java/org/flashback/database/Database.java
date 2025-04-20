@@ -11,6 +11,7 @@ import org.flashback.exceptions.FlashbackException;
 import org.flashback.helpers.Config;
 import org.flashback.types.User;
 import org.flashback.types.FileAddRemoveRequest;
+import org.flashback.types.MemoFile;
 import org.flashback.types.MemoItem;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -39,7 +40,7 @@ public class Database {
     public static User getUser(String username) throws FlashbackException {
         try(var conn = ds.getConnection()) {
 
-            var stmnt = conn.prepareStatement("SELECT username, telegram_user_id FROM users WHERE username = ?");
+            var stmnt = conn.prepareStatement("SELECT telegram_user_id FROM users WHERE username = ?");
             stmnt.setString(1, username);
             var result = stmnt.executeQuery();
 
@@ -48,8 +49,8 @@ public class Database {
             }
 
             var usr = new User();
-            usr.setUsername(result.getString(1));
-            usr.setTelegramUserId(result.getString(2));
+            usr.setUsername(username);
+            usr.setTelegramUserId(result.getString(1));
             return usr;
 
         }
@@ -125,11 +126,11 @@ public class Database {
 
     private static void verifyNewMemoes(Connection conn, String username, MemoItem[] memo_Items) throws SQLException, FlashbackException{
 
-        var owner_check_stmnt = conn.prepareStatement("SELECT username FROM file_owners WHERE username = ? AND file_id = ?");
-        owner_check_stmnt.setString(1, username);
+        var ownerCheckStmnt = conn.prepareStatement("SELECT username FROM file_owners WHERE username = ? AND file_id = ?");
+        ownerCheckStmnt.setString(1, username);
 
-        var parent_check_stmnt = conn.prepareStatement("SELECT type FROM memo_items WHERE username = ? AND item_id = ?");
-        parent_check_stmnt.setString(1, username);
+        var parentCheckStmnt = conn.prepareStatement("SELECT type FROM memo_items WHERE username = ? AND item_id = ?");
+        parentCheckStmnt.setString(1, username);
 
         // file_ids already processed so that we don't have to process them again
         HashSet<String> visited = new HashSet<>();
@@ -144,12 +145,12 @@ public class Database {
             }
 
             if(item.getParent() != null) {
-                parent_check_stmnt.setInt(2, item.getParent());
-                var parent_result = parent_check_stmnt.executeQuery();
-                if(!parent_result.next()) {
+                parentCheckStmnt.setInt(2, item.getParent());
+                var parentResult = parentCheckStmnt.executeQuery();
+                if(!parentResult.next()) {
                     throw new FlashbackException(HttpStatus.NOT_FOUND_404, "parent not found");
                 }
-                if(parent_result.getInt(1) == 1) {
+                if(parentResult.getInt(1) == 1) {
                     throw new FlashbackException(HttpStatus.BAD_REQUEST_400, "invalid parent: expected folder, found note");
                 }
             }
@@ -159,8 +160,8 @@ public class Database {
 
                     if(!visited.add(file.getFileId())) continue;
 
-                    owner_check_stmnt.setString(2, file.getFileId());
-                    var result = owner_check_stmnt.executeQuery();
+                    ownerCheckStmnt.setString(2, file.getFileId());
+                    var result = ownerCheckStmnt.executeQuery();
                     if(!result.next()) {
                         throw new FlashbackException(HttpStatus.NOT_FOUND_404, "file not found");
                     }
@@ -174,34 +175,44 @@ public class Database {
 
             verifyNewMemoes(conn, username, memo_Items);
 
-            var memo_insert_stmnt = conn.prepareStatement(
+            var memoInsertStmnt = conn.prepareStatement(
                 "INSERT INTO memo_items (type, parent, name, note, username) VALUES (?,?,?,?,?) RETURNING item_id");
-            memo_insert_stmnt.setString(5, username);
-            var file_insert_stmnt = conn.prepareStatement("INSERT INTO memo_files (item_id, file_id) VALUES (?,?)");
+            memoInsertStmnt.setString(5, username);
+            var fileInsertStmnt = conn.prepareStatement("INSERT INTO memo_files (item_id, file_id) VALUES (?,?)");
+            var tagInsertStmnt = conn.prepareStatement("INSERT INTO tags (item_id, tag) VALUES (?,?)");
 
             List<MemoItem> processed = new ArrayList<>();
             for(var memo : memo_Items ) {
 
-                memo_insert_stmnt.setInt(1, memo.getType() == MemoItem.ItemType.NOTE ? 1 : 0);
-                memo_insert_stmnt.setInt(2, memo.getParent() == null ? 1 : memo.getParent());
-                memo_insert_stmnt.setString(3, memo.getName());
-                memo_insert_stmnt.setString(4, memo.getNote());
+                memoInsertStmnt.setInt(1, memo.getType() == MemoItem.ItemType.NOTE ? 1 : 0);
+                memoInsertStmnt.setInt(2, memo.getParent() == null ? 1 : memo.getParent());
+                memoInsertStmnt.setString(3, memo.getName());
+                memoInsertStmnt.setString(4, memo.getNote());
 
-                var result = memo_insert_stmnt.executeQuery();
+                var result = memoInsertStmnt.executeQuery();
                 result.next();
-                Integer item_id = result.getInt(1);
+                Integer itemId = result.getInt(1);
 
                 if(memo.getFiles() != null) {
-                    file_insert_stmnt.setInt(1, item_id);
+                    fileInsertStmnt.setInt(1, itemId);
                     for(var file : memo.getFiles()) {
-                        file_insert_stmnt.setString(2, file.getFileId());
-                        file_insert_stmnt.addBatch();
+                        fileInsertStmnt.setString(2, file.getFileId());
+                        fileInsertStmnt.addBatch();
                     }
-                    file_insert_stmnt.executeBatch();
+                    fileInsertStmnt.executeBatch();
+                }
+
+                if(memo.getTags() != null){
+                    tagInsertStmnt.setInt(1, itemId);
+                    for(var tag : memo.getTags()) {
+                        tagInsertStmnt.setString(2, tag);
+                        tagInsertStmnt.addBatch();
+                    }
+                    tagInsertStmnt.executeBatch();
                 }
 
                 var item = new MemoItem();
-                item.setItemid(item_id);
+                item.setItemid(itemId);
                 item.setTempId(memo.getTempId());
                 processed.add(item);
             }
@@ -322,5 +333,68 @@ public class Database {
             throw new FlashbackException();
         }
 
+    }
+
+    public static MemoFile getFile(String username, String fileId) throws FlashbackException {
+        try(var conn = ds.getConnection()) {
+            var stmnt = conn.prepareStatement("SELECT telegram_file_id, original_name, size, mime_type " +
+                " FROM file_owners JOIN files USING (file_id) WHERE username = ? AND file_id = ?");
+            stmnt.setString(1, username);
+            stmnt.setString(2, fileId);
+            var result = stmnt.executeQuery();
+
+            if(!result.next()) {
+                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "file not found");
+            }
+
+            MemoFile file = new MemoFile();
+            file.setFileId(fileId);
+            file.setTelegramFileId(result.getString(1));
+            file.setOriginalName(result.getString(2));
+            file.setSize(result.getInt(3));
+            file.setMime_type(result.getString(4));
+            return file;
+        }
+        catch(FlashbackException e) {
+            throw e;
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
+    }
+
+    public static void addFiles(String username, List<MemoFile> files) throws FlashbackException {
+        try (var conn = ds.getConnection()) {
+            //inset file
+            var ownerInsertStmnt = conn.prepareStatement(
+                "INSERT INTO file_owners (username, file_id) VALUES (?, ?) ON CONFLICT (username, file_id) DO NOTHING"
+            );
+            ownerInsertStmnt.setString(1, username);
+
+            var fileInsertStmnt = conn.prepareStatement(
+                "INSERT INTO files (file_id, telegram_file_id, original_name, mime_type, size)"
+                + "VALUES (?, ?, ?, ?, ?) ON CONFLICT (file_id) DO NOTHING"
+            );
+            for(var file : files) {
+                fileInsertStmnt.setString(1, file.getFileId());
+                fileInsertStmnt.setString(2, file.getTelegramFileId());
+                fileInsertStmnt.setString(3, file.getOriginalName());
+                fileInsertStmnt.setString(4, file.getMime_type());
+                fileInsertStmnt.setInt(5, file.getSize());
+
+                ownerInsertStmnt.setString(2, file.getFileId());
+
+                fileInsertStmnt.addBatch();
+                ownerInsertStmnt.addBatch();
+            }
+
+            fileInsertStmnt.executeBatch();
+            ownerInsertStmnt.executeBatch();
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 }

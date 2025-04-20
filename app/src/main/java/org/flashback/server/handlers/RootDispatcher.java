@@ -19,6 +19,7 @@ public class RootDispatcher implements Runnable {
         handlers.put("getnotes", GetMemoHandler::handle);
         handlers.put("rmnotes", DeleteMemoHandler::handle);
         handlers.put("upload", FileUploadHandler::handle);
+        handlers.put("download", FileDownloadHandler::handle);
         handlers.put("rmfiles", RemoveFilesFromMemoHandler::handle);
         handlers.put("addfiles", AddFilesToMemoHandler::handle);
     }

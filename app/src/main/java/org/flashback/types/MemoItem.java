@@ -8,7 +8,7 @@ public class MemoItem {
     public static enum ItemType {FOLDER, NOTE};
 
     private Integer itemId;
-    private Integer tempId;
+    private transient Integer tempId;
     private String name;
     private ItemType type;
     private Integer parent;

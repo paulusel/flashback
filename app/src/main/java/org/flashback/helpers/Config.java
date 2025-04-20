@@ -14,12 +14,14 @@ import java.util.HashMap;
 
 public class Config {
     private static final Path configFile = Path.of("config.ini");
+    private final static Path uploadsDir = Path.of("uploads");
     private static final String databaseAddress = "jdbc:postgresql://";
     public static final HashMap<String, String> configValues = new HashMap<>();
     private static PrivateKey privateKey;
     private static PublicKey publicKey;
 
     private static int EXPIRATION_SECONDS = 30 * 24 * 3600;
+    private static int maxTransferableBytes = 20*1024*1024;
     private static final String dbHost = "localhost";
     private final static String dbName = "flashback";
     private final static String dbUserName = "flashback";
@@ -84,5 +86,13 @@ public class Config {
 
     public static String getDbpassword() {
         return dbPassword;
+    }
+
+    public static Path getUploadsdir() {
+        return uploadsDir;
+    }
+
+    public static int getMaxTransferableBytes() {
+        return maxTransferableBytes;
     }
 }

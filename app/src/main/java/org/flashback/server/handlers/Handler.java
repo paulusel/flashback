@@ -1,7 +1,7 @@
 package org.flashback.server.handlers;
 
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.io.IOUtils;
@@ -10,7 +10,8 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.types.RequestResponsePair;
 import org.flashback.types.ServerResponse;
 import org.flashback.exceptions.FlashbackException;
-import org.flashback.types.MessageResponse;
+import org.flashback.types.MemoFile;
+import org.flashback.helpers.Config;
 
 import com.google.gson.Gson;
 
@@ -29,7 +30,8 @@ public class Handler {
     }
 
     public static void handleException(RequestResponsePair exchange, FlashbackException e) {
-        MessageResponse response = new MessageResponse(false, e.getStatusCode(), e.getMessage());
+        exchange.getResponse().reset();
+        ServerResponse response = new ServerResponse(false, e.getStatusCode(), e.getMessage());
         sendJsonResponse(response, exchange);
     }
 
@@ -41,7 +43,7 @@ public class Handler {
     }
 
     public static void sendSuccess(RequestResponsePair exchange, String message) {
-        MessageResponse response = new MessageResponse(true, HttpStatus.OK_200, message);
+        ServerResponse response = new ServerResponse(true, HttpStatus.OK_200, message);
         sendJsonResponse(response, exchange);
     }
 
@@ -68,19 +70,25 @@ public class Handler {
         }
     }
 
-    public static void sendData(RequestResponsePair exchange, String mimeType, InputStream in) throws IOException {
-        exchange.getResponse().setStatus(HttpStatus.OK_200);
-        exchange.getResponse().setHeader("Content-Type", mimeType);
-        in.transferTo(exchange.getResponse().getOutputStream());
+    public static void sendFile(RequestResponsePair exchange, MemoFile mFile) throws IOException {
+        var file = Config.getUploadsdir().resolve(mFile.getFileId()).toFile();
+        var response = exchange.getResponse();
+        try(FileInputStream in = new FileInputStream(file)){
+            response.setStatus(HttpStatus.OK_200);
+            response.setHeader("Content-Type", mFile.getMime_type());
+            response.setHeader("Content-Disposition", String.format("inline; filename=\"%s\"", mFile.getOriginalName()));
+            response.setHeader("Content-Length", String.valueOf(mFile.getSize()));
+            in.transferTo(response.getOutputStream());
+        }
     }
 
     public static void sendServerError(RequestResponsePair exchange) {
-        MessageResponse response = new MessageResponse(false, HttpStatus.INTERNAL_SERVER_ERROR_500, "Internal Server Error");
+        ServerResponse response = new ServerResponse(false, HttpStatus.INTERNAL_SERVER_ERROR_500, "Internal Server Error");
         sendJsonResponse(response, exchange);
     }
 
     public static void sendJsonExpecedError(RequestResponsePair exchange) {
-        MessageResponse response = new MessageResponse(false, HttpStatus.BAD_REQUEST_400, "Expected JSON Data");
+        ServerResponse response = new ServerResponse(false, HttpStatus.BAD_REQUEST_400, "Expected JSON Data");
         Handler.sendJsonResponse(response, exchange);
     }
 }
