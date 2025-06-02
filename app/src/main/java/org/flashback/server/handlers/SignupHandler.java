@@ -6,23 +6,22 @@ import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.RequestResponsePair;
 import org.flashback.types.AuthResponse;
-import org.flashback.types.User;
-
-import com.google.gson.Gson;
+import org.flashback.types.FlashBackUser;
+import org.flashback.helpers.*;
 
 public class SignupHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
-            Handler.checkJsonBody(exchange.getRequest());
-            String json = Handler.requestBodyString(exchange.getRequest());
-            User user = new Gson().fromJson(json, User.class);
+            GenericHandler.checkJsonBody(exchange.getRequest());
+            String json = GenericHandler.requestBodyString(exchange.getRequest());
+            FlashBackUser user = Json.deserialize(json, FlashBackUser.class);
             Database.addNewUser(user);
-            String token = Authenticator.generateToken(user.getUsername());
+            String token = Authenticator.generateToken(user.getUserId());
             AuthResponse response = new AuthResponse(true, HttpStatus.CREATED_201, token, user);
-            Handler.sendJsonResponse(response, exchange);
+            GenericHandler.sendResponse(response, exchange);
         }
         catch(FlashbackException e) {
-            Handler.handleException(exchange, e);
+            GenericHandler.handleException(exchange, e);
         }
     }
 }

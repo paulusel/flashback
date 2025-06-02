@@ -2,13 +2,13 @@ package org.flashback.types;
 
 public class FileAddRemoveRequest {
     private String fileId;
-    private Integer memoId;
+    private Integer noteId;
 
     public FileAddRemoveRequest() {}
 
     public FileAddRemoveRequest(String fileId, Integer memoId) {
         this.fileId = fileId;
-        this.memoId = memoId;
+        this.noteId = memoId;
     }
 
     public String getFileId() {
@@ -19,11 +19,11 @@ public class FileAddRemoveRequest {
         this.fileId = fileId;
     }
 
-    public Integer getMemoId() {
-        return memoId;
+    public Integer getNoteId() {
+        return noteId;
     }
 
-    public void setMemoId(Integer memoId) {
-        this.memoId = memoId;
+    public void setNoteId(Integer memoId) {
+        this.noteId = memoId;
     }
 }

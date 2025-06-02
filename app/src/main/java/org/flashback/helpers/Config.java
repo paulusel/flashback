@@ -1,98 +1,77 @@
 package org.flashback.helpers;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.FileReader;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 
 public class Config {
-    private static final Path configFile = Path.of("config.ini");
-    private final static Path uploadsDir = Path.of("uploads");
-    private static final String databaseAddress = "jdbc:postgresql://";
     public static final HashMap<String, String> configValues = new HashMap<>();
-    private static PrivateKey privateKey;
-    private static PublicKey publicKey;
+    public static final List<String> mandatory_keys = Arrays.asList("dbhost", "dbname", "dbusername", "dbpassword",
+        "server_port", "public_key", "private_key", "uploads_dir",  "bot_token"
+    );
 
-    private static int EXPIRATION_SECONDS = 30 * 24 * 3600;
-    private static int maxTransferableBytes = 20*1024*1024;
-    private static final String dbHost = "localhost";
-    private final static String dbName = "flashback";
-    private final static String dbUserName = "flashback";
-    private final static String dbPassword = "";
+    public static final List<String> numeric_keys = Arrays.asList("jwt_token_expiry", "server_port", "server_nthreads",
+        "server_queue_size", "max_file_size"
+    );
 
-    public static void configure() throws Exception {
-       try(
-            FileInputStream sec  = new FileInputStream("secret_key.asc");
-            FileInputStream pub = new FileInputStream("public_key.asc");
-        ) {
-            var sec_bytes = sec.readAllBytes();
-            var pub_bytes = pub.readAllBytes();
-            KeyFactory keefactory = KeyFactory.getInstance("EdDSA");
-            privateKey = keefactory.generatePrivate(new PKCS8EncodedKeySpec(sec_bytes));
-            publicKey = keefactory.generatePublic(new X509EncodedKeySpec(pub_bytes));
-        }
+    public static final List<String> file_keys = Arrays.asList("public_key", "private_key", "uploads_dir", "temp_dir");
 
+    public static void init(String filename) throws Exception {
+        Path configFile = Path.of(filename);
         try(
             FileReader reader = new FileReader(configFile.toString());
-            BufferedReader lineReader = new BufferedReader(reader);)
+            BufferedReader lineReader = new BufferedReader(reader))
         {
             lineReader.lines().forEach(line -> {
                 line = line.trim();
                 if(line.isEmpty()) return;
                 int indx = line.indexOf('=');
-                if(indx == -1 || indx == 0) {
+                if(indx < 1) {
                     throw new IllegalArgumentException("illegal entry in config file: [" + line + "]");
                 }
                 String key = line.substring(0, indx).trim();
                 String value = line.substring(indx + 1).trim();
-                if(key.isEmpty()) {
-                    throw new IllegalArgumentException("illegal entry in config file: [" + line + "]");
-                }
                 configValues.put(key, value == null ? "" : value);
             });
         }
+
+        mandatory_keys.stream().forEach(key -> {
+            String value = configValues.get(key);
+            if(value == null || value.isEmpty()) {
+                throw new RuntimeException("missing " + key + " in config");
+            }
+        });
+
+        numeric_keys.forEach(key -> {
+            String value = configValues.get(key);
+            if(value == null || value.isEmpty()) return;
+            if(!StringUtils.isNumeric(value)) {
+                throw new RuntimeException("expected numberic value for " + key + " in config. found: " + value);
+            }
+            Integer num = Integer.valueOf(value);
+            if(num < 1 || (key.equals("server_port") && num > 65535) || (!key.equals("server_port") && num > 200)) {
+                throw new RuntimeException("config value for [" + key + "] in config is out of bound. value: " + value);
+            }
+        });
+
+        file_keys.forEach(key -> {
+            String value = configValues.get(key);
+            if(value == null || value.isEmpty()) return;
+
+            Path filePath = Path.of(value);
+            if(!Files.exists(filePath)) {
+                throw new RuntimeException("config value for [" + key + "]: file not found. value: " + value);
+            }
+        });
     }
 
-    public static PublicKey getPublicKey() {
-        return publicKey;
-    }
-
-    public static PrivateKey getPrivateKey() {
-        return privateKey;
-    }
-
-    public static int getExpirationDuration() {
-        return EXPIRATION_SECONDS;
-    }
-
-    public static String getDatabaseName() {
-        return dbName;
-    }
-
-    public static String getDatabaseUrl() {
-        return databaseAddress + dbHost + "/" + dbName;
-    }
-
-    public static String getDatabaseUserName() {
-        return dbUserName;
-    }
-
-    public static String getDbpassword() {
-        return dbPassword;
-    }
-
-    public static Path getUploadsdir() {
-        return uploadsDir;
-    }
-
-    public static int getMaxTransferableBytes() {
-        return maxTransferableBytes;
+    public static String getValue(String key) {
+        return configValues.get(key);
     }
 }

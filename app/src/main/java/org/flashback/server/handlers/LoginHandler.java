@@ -7,32 +7,27 @@ import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.RequestResponsePair;
 import org.flashback.types.AuthResponse;
-import org.flashback.types.User;
-
-import com.google.gson.Gson;
+import org.flashback.types.FlashBackUser;
+import org.flashback.helpers.*;
 
 public class LoginHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try {
-            Handler.checkJsonBody(exchange.getRequest());
-            String json = Handler.requestBodyString(exchange.getRequest());
-            User user = new Gson().fromJson(json, User.class);
-            if(user.getUsername() == null || user.getPassword() == null) {
+            GenericHandler.checkJsonBody(exchange.getRequest());
+            String json = GenericHandler.requestBodyString(exchange.getRequest());
+            FlashBackUser user = Json.deserialize(json, FlashBackUser.class);
+            if(user.getUserName() == null || user.getPassword() == null) {
                 throw new FlashbackException("username or password missing");
             }
 
-            if(!Database.authenticate(user)) {
-                throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "incorrect username or password");
-            }
-
-            String token = Authenticator.generateToken(user.getUsername());
-            user = Database.getUser(user.getUsername());
+            user = Database.authenticate(user);
+            String token = Authenticator.generateToken(user.getUserId());
             AuthResponse response = new AuthResponse(true, HttpStatus.OK_200, token, user);
-            Handler.sendJsonResponse(response, exchange);
+            GenericHandler.sendResponse(response, exchange);
         }
         catch(FlashbackException e) {
-            Handler.handleException(exchange, e);
+            GenericHandler.handleException(exchange, e);
         }
     }
 }

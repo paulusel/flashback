@@ -1,14 +1,12 @@
 package org.flashback.types;
 
-public class AuthResponse extends ServerResponse{
+public class AuthResponse extends UserDataResponse {
     private String token;
-    private User user;
 
     public AuthResponse() {}
-    public AuthResponse(boolean ok, int statusCode, String token, User user) {
-        super(ok, statusCode);
+    public AuthResponse(boolean ok, int statusCode, String token, FlashBackUser user) {
+        super(ok, statusCode, user);
         this.token = token;
-        this.user = user;
     }
 
     public String getToken() {
@@ -17,13 +15,5 @@ public class AuthResponse extends ServerResponse{
 
     public void setToken(String token) {
         this.token = token;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
     }
 }
