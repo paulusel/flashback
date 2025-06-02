@@ -6,18 +6,18 @@ package org.flashback.types;
 public class FlashBackUser {
 
     private String username;
-    private Long userId;
+    private Integer userId;
     private String password;
     transient private Long telegramChatId;
     transient private Long telegramUserId;
 
     public FlashBackUser() {}
 
-    public FlashBackUser(Long userId) {
+    public FlashBackUser(Integer userId) {
         this.userId = userId;
     }
 
-    public FlashBackUser(Long userId, Long telegramUserId, Long telegramChatId){
+    public FlashBackUser(Integer userId, Long telegramUserId, Long telegramChatId){
         this.telegramUserId = telegramUserId;
         this.telegramChatId = telegramChatId;
         this.userId = userId;
@@ -48,11 +48,11 @@ public class FlashBackUser {
         this.telegramUserId = telegramUserId;
     }
 
-    public Long getUserId() {
+    public Integer getUserId() {
         return userId;
     }
 
-    public void setUserId(Long userId) {
+    public void setUserId(Integer userId) {
         this.userId = userId;
     }
 

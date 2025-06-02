@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-public class Note {
+public class FlashBackNote {
     private Integer noteId;
     private String note;
     private Date modified;
@@ -12,7 +12,7 @@ public class Note {
     private List<String> tags = new ArrayList<>();
     private List<NoteFile> files = new ArrayList<>();
 
-    public Note() {}
+    public FlashBackNote() {}
 
     public Integer getNoteId() {
         return noteId;

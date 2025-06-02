@@ -12,7 +12,7 @@ public class DeleteNoteHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
             GenericHandler.checkJsonBody(exchange.getRequest());
-            Long userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.getRequest());
             String json = GenericHandler.requestBodyString(exchange.getRequest());
             int noteId = Json.deserialize(json, int.class);
             Database.deleteNote(userId, noteId);

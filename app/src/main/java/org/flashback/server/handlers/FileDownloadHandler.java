@@ -11,7 +11,7 @@ import org.flashback.helpers.*;
 public class FileDownloadHandler {
     public static void handle(RequestResponsePair exchange) {
         try{
-            Long userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.getRequest());
             String json = GenericHandler.requestBodyString(exchange.getRequest());
             String fileId = Json.deserialize(json, String.class);
             var file = Database.getFile(userId, fileId);

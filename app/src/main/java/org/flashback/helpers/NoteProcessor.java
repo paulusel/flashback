@@ -20,7 +20,7 @@ import org.apache.commons.fileupload2.jakarta.servlet6.JakartaServletDiskFileUpl
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.flashback.exceptions.FlashbackException;
-import org.flashback.types.Note;
+import org.flashback.types.FlashBackNote;
 import org.flashback.types.NoteFile;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,14 +65,14 @@ public class NoteProcessor {
         //upload.setFileSizeMax(fileSizeMax);
     }
 
-    public static Note extractNoteFromForm(HttpServletRequest request) throws FlashbackException {
+    public static FlashBackNote extractNoteFromForm(HttpServletRequest request) throws FlashbackException {
 
         if(!JakartaServletDiskFileUpload.isMultipartContent(request)){
             throw new FlashbackException("invalid content: expected multipart/form-data");
         }
 
         try {
-            Note note = new Note();
+            FlashBackNote note = new FlashBackNote();
             var iterator = upload.getItemIterator(request);
             while(iterator.hasNext()) {
                 FileItemInput item = iterator.next();
@@ -148,7 +148,7 @@ public class NoteProcessor {
         }
     }
 
-    public static void cleanFiles(Long userId, Note note) {
+    public static void cleanFiles(Integer userId, FlashBackNote note) {
         for(var file : note.getFiles()) {
             try {
                 Files.deleteIfExists(tempDir.resolve(file.getFileName()));
@@ -163,7 +163,7 @@ public class NoteProcessor {
         }
     }
 
-    public static void postProcessFiles(Long userId, Note note) throws Exception {
+    public static void postProcessFiles(Integer userId, FlashBackNote note) throws Exception {
         Path user_dir = destDir.resolve(String.valueOf(userId));
         if(!Files.exists(user_dir)) {
             Files.createDirectory(user_dir);

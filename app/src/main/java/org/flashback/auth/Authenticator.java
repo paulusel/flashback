@@ -46,7 +46,7 @@ public class Authenticator {
      * @return username of the user if authenticated, or null otherwise
      * @throws FlashbackException if token not found or invalid or expired
      */
-    public static Long authenticate(HttpServletRequest request) throws FlashbackException {
+    public static Integer authenticate(HttpServletRequest request) throws FlashbackException {
         try {
             String cookie = extractCookie(request);
             String token = cookie.isEmpty() ? extractBearer(request) : cookie;
@@ -62,7 +62,7 @@ public class Authenticator {
                     .getPayload()
                     .getSubject();
 
-            return Long.valueOf(userIdStr);
+            return Integer.valueOf(userIdStr);
         }
         catch(JwtException e) {
             throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "invalid or expired bearer token");
@@ -74,7 +74,7 @@ public class Authenticator {
      * @return token generated
      */
 
-    public static String generateToken(Long userId) {
+    public static String generateToken(Integer userId) {
         return Jwts.builder()
                 .signWith(privateKey)
                 .subject(String.valueOf(userId))
@@ -82,7 +82,7 @@ public class Authenticator {
                 .compact();
     }
 
-    public static String generateOtpToken(Long userId) {
+    public static String generateOtpToken(Integer userId) {
         return Jwts.builder()
             .subject(String.valueOf(userId))
             .expiration(Date.from(Instant.now().plusSeconds(600)))
@@ -90,7 +90,7 @@ public class Authenticator {
             .compact();
     }
 
-    public static Long verifyOtpToken(String token) throws FlashbackException {
+    public static Integer verifyOtpToken(String token) throws FlashbackException {
         try {
             String userIdStr = Jwts.parser()
                     .decryptWith(privateKey)
@@ -99,10 +99,10 @@ public class Authenticator {
                     .getPayload()
                     .getSubject();
 
-            return Long.valueOf(userIdStr);
+            return Integer.valueOf(userIdStr);
         }
         catch(JwtException e) {
-            throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "invalid or expired bearer token");
+            throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "invalid or expired otp token");
         }
     }
 

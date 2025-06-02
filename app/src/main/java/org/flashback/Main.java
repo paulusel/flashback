@@ -3,7 +3,7 @@ package org.flashback;
 import org.flashback.database.Database;
 import org.flashback.helpers.Config;
 import org.flashback.server.FlashBackServer;
-import org.flashback.telegram.Bot;
+import org.flashback.telegram.FlashBackBot;
 
 public class Main {
     public static void main(String[] args) {
@@ -12,10 +12,10 @@ public class Main {
 
             Database.init();
             FlashBackServer.init();
-            Bot.init();
+            FlashBackBot.init();
 
             FlashBackServer.getServer().startService();
-            Bot.getBot().start();
+            FlashBackBot.getBot().start();
         }
         catch(Exception e) {
             e.printStackTrace();

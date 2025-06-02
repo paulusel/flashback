@@ -1,15 +1,22 @@
 package org.flashback.telegram;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 
-import org.flashback.types.Note;
+import org.flashback.types.FlashBackNote;
+import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.FlashBackUser;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.GetMe;
+import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
@@ -33,22 +40,72 @@ public class BotActionHandler implements LongPollingSingleThreadUpdateConsumer {
         return user.getUserName();
     }
 
-    public void sendNote(FlashBackUser user, Note note) {
+    /*
+     *  For new note, files of the note are modified to have fileIds from telegram 
+     */
+    public FlashBackNote sendNote(FlashBackUser user, FlashBackNote note) throws TelegramApiException {
         Long chatId = user.getTelegramUserId();
-        if(chatId == null) return;
+        if(chatId == null) throw new TelegramApiException();
 
         if(note.getFiles() != null) {
-            //sendMessage(user, note);
+            List<NoteFileCategory> categories = NoteFileLabeler.categorize(user, note.getFiles());
+            for(NoteFileCategory category: categories) {
+                List<String> fileIds = sendMediaGroup(user, category.media);
+                for(int i = 0; i<fileIds.size(); ++i) {
+                    category.files.get(i).setFileId(fileIds.get(i));
+                }
+            }
         }
+
+        sendMessageWithInlineInput(user, note);
+        return note;
     }
 
-    private void sendSimpleMessage(Long chatId, String text) throws TelegramApiException {
+    private List<String> sendMediaGroup(FlashBackUser user, List<InputMedia> media) throws TelegramApiException {
+        if(media == null) return null;
+        var builder = SendMediaGroup
+            .builder()
+            .chatId(user.getTelegramChatId());
+
+        for(InputMedia medium: media) {
+            builder.media(medium);
+        }
+
+        List<Message> messages = client.execute(builder.build());
+        List<String> fileIds = new ArrayList<>();
+
+        for(Message message : messages) {
+            if(message.hasPhoto()) {
+                PhotoSize largestPhoto = message.getPhoto().stream()
+                    .max(Comparator.comparing(PhotoSize::getFileSize))
+                    .orElse(null);
+                fileIds.add(largestPhoto.getFileId());
+            }
+            else if(message.hasVideo()) {
+                fileIds.add(message.getVideo().getFileId());
+            }
+            else if(message.hasAudio()) {
+                fileIds.add(message.getAudio().getFileId());
+            }
+            else if(message.hasDocument()) {
+                fileIds.add(message.getDocument().getFileId());
+            }
+        }
+
+        return fileIds;
+    }
+
+    private void sendPlainMessage(Long chatId, String text) throws TelegramApiException {
         SendMessage sendMsg = SendMessage
             .builder()
             .chatId(chatId)
             .text(text)
             .build();
         client.execute(sendMsg);
+    }
+
+    private void sendMessageWithInlineInput(FlashBackUser user, FlashBackNote note){
+
     }
 
     @Override
@@ -78,7 +135,7 @@ public class BotActionHandler implements LongPollingSingleThreadUpdateConsumer {
                     handler.handle(argument, message);
                 }
                 else {
-                    sendSimpleMessage(message.getChatId(), "unreacognized command");
+                    sendPlainMessage(message.getChatId(), "unreacognized command");
                 }
             }
         }
@@ -86,21 +143,24 @@ public class BotActionHandler implements LongPollingSingleThreadUpdateConsumer {
 
     public void handleCallbackQuery(CallbackQuery query) throws TelegramApiException {
         Long chatId = query.getMessage().getChatId();
-        sendSimpleMessage(chatId, "comming soon");
+        sendPlainMessage(chatId, "comming soon");
     }
 
     public void startCommandHandler(String token, Message message) throws TelegramApiException {
         if(token == null || token.isEmpty()) {
-            sendSimpleMessage(message.getChatId(), "please generate signin token before starting this bot");
+            sendPlainMessage(message.getChatId(), "please generate signin token before starting this bot");
         }
         else {
             try {
-                UserRegistration.registerTelegramUser(message.getFrom().getId(), message.getChatId(), token);
-                sendSimpleMessage(message.getChatId(),
+                BotUserRegistrationHandler.registerTelegramUser(message.getFrom().getId(), message.getChatId(), token);
+                sendPlainMessage(message.getChatId(),
                     "Welcome. You can now send notes. And also see notes sent from elsewhere here");
             }
+            catch(FlashbackException e) {
+                sendPlainMessage(message.getChatId(), e.getMessage());
+            }
             catch(Exception e) {
-                sendSimpleMessage(message.getChatId(), "token not recognized or expired");
+                sendPlainMessage(message.getChatId(), "unknown server error. please try again later");
             }
         }
     }

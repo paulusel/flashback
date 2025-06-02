@@ -4,7 +4,7 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.auth.Authenticator;
 import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
-import org.flashback.types.Note;
+import org.flashback.types.FlashBackNote;
 import org.flashback.types.NoteResponse;
 import org.flashback.types.RequestResponsePair;
 import org.flashback.helpers.NoteProcessor;
@@ -14,8 +14,8 @@ public class AddFilesToNoteHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try {
-            Long userId = Authenticator.authenticate(exchange.getRequest());
-            Note note = null;
+            Integer userId = Authenticator.authenticate(exchange.getRequest());
+            FlashBackNote note = null;
             try {
                 note = NoteProcessor.extractNoteFromForm(exchange.getRequest());
                 Database.updateNote(userId, note);
