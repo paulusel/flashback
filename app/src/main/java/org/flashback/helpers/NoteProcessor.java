@@ -1,18 +1,21 @@
 package org.flashback.helpers;
 
-import java.util.Scanner;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.util.Arrays;
-import java.util.HexFormat;
-import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+
+import java.util.Arrays;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.List;
+import java.util.Scanner;
 
 import org.apache.commons.fileupload2.core.DiskFileItemFactory;
 import org.apache.commons.fileupload2.core.FileItemInput;
@@ -26,8 +29,25 @@ import org.flashback.types.NoteFile;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class NoteProcessor {
-    //private final static int fileSizeMax = 20 * 1024 * 1024;
-    private static List<String> vidoes_extensions = Arrays.asList("mp4", "mov", "mkv", "avi", "webm", "flv");
+
+    public static final List<String> VIDEO_EXTENSIONS = Arrays.asList("mp4", "mov", "mkv", "avi", "webm", "flv");
+
+    public static final Map<String, String> MIME_TO_EXTENSION = Map.ofEntries(
+        Map.entry("image/jpeg", ".jpg"),
+        Map.entry("image/png", ".png"),
+        Map.entry("image/webp", ".webp"),
+        Map.entry("image/gif", ".gif"),
+        Map.entry("video/mp4", ".mp4"),
+        Map.entry("video/quicktime", ".mov"),
+        Map.entry("video/webm", ".webm"),
+        Map.entry("audio/mpeg", ".mp3"),
+        Map.entry("audio/ogg", ".ogg"),
+        Map.entry("application/pdf", ".pdf"),
+        Map.entry("application/zip", ".zip"),
+        Map.entry("application/x-rar-compressed", ".rar"),
+        Map.entry("text/plain", ".txt")
+    );
+
     private static Path tempDir;
     private static Path destDir;
     private static DiskFileItemFactory factory;
@@ -48,14 +68,6 @@ public class NoteProcessor {
 
         destDir = Path.of(upload_dir);
         tempDir = Path.of(temp_dir);
-
-        if(!Files.exists(destDir)) {
-            Files.createDirectories(destDir);
-        }
-
-        if(!Files.exists(tempDir)) {
-            Files.createDirectories(tempDir);
-        }
 
         factory = DiskFileItemFactory.builder()
             .setBufferSize(0)
@@ -92,8 +104,11 @@ public class NoteProcessor {
                     }
                 }
                 else {
-                    NoteFile file = processFile(iterator.next());
-                    note.addFile(file);
+                    FileItemInput fileItem = iterator.next();
+                    try (InputStream stream = fileItem.getInputStream()) {
+                        NoteFile file = processFile(stream, fileItem.getName());
+                        note.addFile(file);
+                    }
                 }
             }
 
@@ -116,12 +131,10 @@ public class NoteProcessor {
         }
     }
 
-    private static NoteFile processFile(FileItemInput item) throws FlashbackException {
+    public static NoteFile processFile(InputStream stream, String fileName) throws FlashbackException {
         try{
-            String fileName = item.getName();
             Path filePath = tempDir.resolve(fileName);
 
-            InputStream stream = item.getInputStream();
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             DigestInputStream digestStream = new DigestInputStream(stream, digest);
             Files.copy(digestStream, filePath, StandardCopyOption.REPLACE_EXISTING);
@@ -129,6 +142,10 @@ public class NoteProcessor {
 
             String extension = FilenameUtils.getExtension(fileName);
             String contentType = Files.probeContentType(filePath);
+            if(extension == null || extension.isEmpty() || extension.equals(".tmp")) {
+                extension = MIME_TO_EXTENSION.get(contentType);
+                extension = extension == null ? ".dat" : extension;
+            }
 
             NoteFile file = new NoteFile();
             file.setFileId(hash);
@@ -176,7 +193,7 @@ public class NoteProcessor {
             Path dest = dest_dir.resolve(file.getFileName());
             Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
 
-            if(vidoes_extensions.contains(file.getExtension())) {
+            if(VIDEO_EXTENSIONS.contains(file.getExtension())) {
                 ffmpegProcessVideo(dest);
             }
         }

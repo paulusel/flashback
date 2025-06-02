@@ -22,7 +22,7 @@ public class FlashBackBot {
     private FlashBackBot(String token) {
         this.token = token;
         this.client = new OkHttpTelegramClient(token);
-        this.botActionHandler = new BotActionHandler(client);
+        this.botActionHandler = new BotActionHandler(client, token);
     }
 
     public static void init() throws Exception {

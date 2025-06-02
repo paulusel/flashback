@@ -1,35 +1,46 @@
 package org.flashback.telegram;
 
+import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
 import org.flashback.types.FlashBackNote;
+import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
+import org.flashback.helpers.NoteProcessor;
 import org.flashback.types.FlashBackUser;
-import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
+import org.flashback.types.NoteFile;
+
+import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.GetMe;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
-public class BotActionHandler implements LongPollingSingleThreadUpdateConsumer {
+public class BotActionHandler implements LongPollingUpdateConsumer{
     private TelegramClient client;
+    private String token;
     private HashMap<String, CommandHandler> commandHandlers = new HashMap<>();
 
-    public BotActionHandler(TelegramClient client) {
+    public BotActionHandler(TelegramClient client, String token) {
         this.client = client;
+        this.token = token;
         commandHandlers.put("start", this::startCommandHandler);
     }
-
 
     public String getBotUserName() throws Exception {
         GetMe getMe = GetMe
@@ -109,21 +120,128 @@ public class BotActionHandler implements LongPollingSingleThreadUpdateConsumer {
     }
 
     @Override
-    public void consume(Update update) {
+    public void consume(List<Update> updates) {
         try {
-            if(update.hasMessage()) {
-                handleMessage(update.getMessage());
+            HashMap<String, List<Message>> maps = new HashMap<>();
+            for(Update update : updates) {
+                if(update.hasMessage()) {
+                    Message message = update.getMessage();
+                    String groupId = message.getMediaGroupId();
+                    if(groupId != null) {
+                        List<Message> group = maps.get(groupId);
+                        if(group == null) {
+                            group = new ArrayList<>();
+                            maps.put(groupId, group);
+                        }
+                        group.add(message);
+                    }
+                    else {
+                        handleMessage(message);
+                    }
+                }
+                else if(update.hasCallbackQuery()) {
+                    handleCallbackQuery(update.getCallbackQuery());
+                }
             }
-            else if(update.hasCallbackQuery()) {
-                handleCallbackQuery(update.getCallbackQuery());
+
+            for(List<Message> group : maps.values()) {
+                handleMediaGroup(group);
             }
         }
-        catch(TelegramApiException e) {
+        catch(TelegramApiException | FlashbackException e) {
             e.printStackTrace();
         }
     }
 
-    public void handleMessage(Message message) throws TelegramApiException {
+    private Integer getOriginalNoteId(Message message) {
+        Message original = message.getReplyToMessage();
+        if(original == null) return null;
+
+        InlineKeyboardMarkup keyboard = original.getReplyMarkup();
+        if(keyboard == null) return null;
+
+        String data = keyboard.getKeyboard().get(0).get(0).getCallbackData();
+        if(data == null) return null;
+
+        return Integer.valueOf(data);
+    }
+
+    private void handleMediaGroup(List<Message> group) throws TelegramApiException, FlashbackException{
+        Long chatId = group.get(0).getChatId();
+        FlashBackUser user = Database.getUserByChatId(chatId);
+
+        FlashBackNote note = new FlashBackNote();
+        String noteTxt = "";
+        List<NoteFile> files = note.getFiles();
+
+        for(Message message : group) {
+            String caption = message.getCaption();
+            if(caption != null && !caption.isEmpty()) {
+                noteTxt += "\n\n" + caption;
+            }
+
+            String fileId = "";
+            String fileName = null;
+            if(message.hasPhoto()) {
+                fileId = Collections.max(message.getPhoto(),
+                        Comparator.comparing(PhotoSize::getFileSize)).getFileId();
+            }
+            else if(message.hasAudio()) {
+                fileId = message.getAudio().getFileId();
+                fileName = message.getAudio().getFileName();
+            }
+            else if(message.hasVideo()) {
+                fileId = message.getVideo().getFileId();
+                fileName = message.getVideo().getFileName();
+            }
+            else if(message.hasDocument()) {
+                fileId = message.getDocument().getFileId();
+                fileName = message.getDocument().getFileName();
+            }
+
+            if(!fileId.isEmpty()) {
+                files.add(downloadFile(fileId, fileName));
+            }
+        }
+
+        note.setNote(noteTxt);
+
+        try {
+            NoteProcessor.postProcessFiles(user.getUserId(), note);
+            note = Database.addNote(user.getUserId(), note);
+        }
+        catch(Exception e) {
+            NoteProcessor.cleanFiles(user.getUserId(), note);
+            throw new TelegramApiException();
+        }
+
+        sendNote(user, note);
+    }
+
+    private NoteFile downloadFile(String fileId, String fileName) throws TelegramApiException {
+        GetFile getFile = GetFile
+            .builder()
+            .fileId(fileId)
+            .build();
+
+        if(fileName == null ) {
+            fileName = fileId + ".tmp";
+        }
+
+        File file = client.execute(getFile);
+        String fileUrl = file.getFileUrl(this.token);
+
+        try(InputStream stream = new URI(fileUrl).toURL().openStream()) {
+            NoteFile noteFile = NoteProcessor.processFile(stream, fileName);
+            noteFile.setTelegramFileId(fileId);
+            return noteFile;
+        }
+        catch(Exception e) {
+            throw new TelegramApiException(e);
+        }
+    }
+
+    private void handleMessage(Message message) throws TelegramApiException {
         if(message.hasText()) {
             String text = message.getText().trim();
             if(text.startsWith("/")) {

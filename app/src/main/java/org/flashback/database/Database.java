@@ -321,6 +321,10 @@ public class Database {
         }
     }
 
+    public static FlashBackUser getUserByChatId(Long chatId) throws FlashbackException {
+
+    }
+
     public static FlashBackNote updateNote(Integer userId, FlashBackNote note) throws FlashbackException {
 
     }
