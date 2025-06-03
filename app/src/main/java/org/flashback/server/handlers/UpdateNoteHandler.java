@@ -20,7 +20,7 @@ public class UpdateNoteHandler {
             Integer userId = Authenticator.authenticate(exchange.getRequest());
             try {
                 note = NoteProcessor.extractNoteFromForm(exchange.getRequest());
-                note = Database.updateNote(userId, note);
+                Database.addOrUpdateNote(userId, note);
                 NoteProcessor.postProcessFiles(userId, note);
             }
             catch(Exception e) {

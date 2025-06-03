@@ -106,7 +106,7 @@ public class NoteProcessor {
                 else {
                     FileItemInput fileItem = iterator.next();
                     try (InputStream stream = fileItem.getInputStream()) {
-                        NoteFile file = processFile(stream, fileItem.getName());
+                        NoteFile file = processFile(new NoteFile(), stream, fileItem.getName());
                         note.addFile(file);
                     }
                 }
@@ -131,7 +131,7 @@ public class NoteProcessor {
         }
     }
 
-    public static NoteFile processFile(InputStream stream, String fileName) throws FlashbackException {
+    public static NoteFile processFile(NoteFile file, InputStream stream, String fileName) throws FlashbackException {
         try{
             Path filePath = tempDir.resolve(fileName);
 
@@ -147,7 +147,6 @@ public class NoteProcessor {
                 extension = extension == null ? ".dat" : extension;
             }
 
-            NoteFile file = new NoteFile();
             file.setFileId(hash);
             file.setExtension(extension);
 

@@ -18,7 +18,7 @@ public class AddNoteHandler {
             FlashBackNote note = null;
             try {
                 note = NoteProcessor.extractNoteFromForm(exchange.getRequest());
-                note = Database.addNote(userId, note);
+                Database.addNoteAndAssignId(userId, note);
                 NoteProcessor.postProcessFiles(userId, note);
             }
             catch(Exception e) {

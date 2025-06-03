@@ -10,7 +10,6 @@ import org.flashback.types.FileAddRemoveRequest;
 import org.flashback.types.NoteFile;
 import org.flashback.types.FlashBackNote;
 import org.mindrot.jbcrypt.BCrypt;
-import org.telegram.telegrambots.meta.api.objects.User;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -123,7 +122,7 @@ public class Database {
         }
     }
 
-    public static FlashBackNote addNote(Integer userId, FlashBackNote note) throws FlashbackException {
+    public static void addNoteAndAssignId(Integer userId, FlashBackNote note) throws FlashbackException {
         try(var conn = ds.getConnection()) {
             var memoInsertStmnt = conn.prepareStatement(
                 "INSERT INTO memo_items (type, parent, name, note, username) VALUES (?,?,?,?,?) RETURNING item_id");
@@ -144,6 +143,7 @@ public class Database {
                     fileInsertStmnt.addBatch();
                 }
                 fileInsertStmnt.executeBatch();
+                // TODO: fileIds need to copy back to the note
             }
 
             if(note.getTags() != null){
@@ -156,7 +156,6 @@ public class Database {
             }
 
             note.setNoteId(noteId);
-            return note;
         }
         catch(Exception e) {
             e.printStackTrace();
@@ -322,14 +321,27 @@ public class Database {
     }
 
     public static FlashBackUser getUserByChatId(Long chatId) throws FlashbackException {
+        return new FlashBackUser();
+    }
+
+    public static void updateNote(Integer userId, FlashBackNote note) throws FlashbackException {
 
     }
 
-    public static FlashBackNote updateNote(Integer userId, FlashBackNote note) throws FlashbackException {
+    public static void updateUser(Integer userId, FlashBackUser user) throws FlashbackException {
 
     }
 
-    public static User updateUser(Integer userId, FlashBackUser user) throws FlashbackException {
+    public static void addOrUpdateNote(Integer userId, FlashBackNote note) throws FlashbackException {
+        if(note.getNoteId() == null) {
+            addNoteAndAssignId(userId, note);
+        }
+        else {
+            updateNote(userId, note);
+        }
+    }
 
+    public static List<FlashBackNote> searchNotes(Integer userId, String keyword) throws FlashbackException {
+        return null;
     }
 }
