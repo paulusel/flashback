@@ -3,12 +3,14 @@ package org.flashback.telegram;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
 import org.flashback.types.FlashBackNote;
+import org.flashback.auth.Authenticator;
 import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.helpers.NoteProcessor;
@@ -31,10 +33,10 @@ import org.telegram.telegrambots.meta.api.objects.Video;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
-
-import io.jsonwebtoken.lang.Arrays;
 
 import org.apache.commons.io.FilenameUtils;
 
@@ -81,7 +83,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             }
         }
 
-        sendNoteTextWithKeyboard(user, note);
+        sendNoteText(user, note);
         return note;
     }
 
@@ -89,6 +91,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         if(media == null) return null;
         var builder = SendMediaGroup
             .builder()
+            .disableNotification(true)
             .chatId(user.getTelegramChatId());
 
         for(InputMedia medium: media) {
@@ -124,6 +127,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             SendMessage sendMsg = SendMessage
                 .builder()
                 .chatId(chatId)
+                .disableNotification(true)
                 .text(text)
                 .build();
             client.execute(sendMsg);
@@ -133,8 +137,28 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         }
     }
 
-    private void sendNoteTextWithKeyboard(FlashBackUser user, FlashBackNote note){
+    private void sendNoteText(FlashBackUser user, FlashBackNote note) throws TelegramApiException {
+        InlineKeyboardButton removeButton = new InlineKeyboardButton("Remove");
+        removeButton.setCallbackData(String.valueOf(note.getNoteId()));
 
+        String txt = note.getNote() == null ? "No note text" : note.getNote();
+        if(!note.getTags().isEmpty()) {
+            txt += "\n\nTags: " + String.join(", ", note.getTags());
+        }
+
+        SendMessage sendMessage = SendMessage
+            .builder()
+            .disableNotification(true)
+            .chatId(user.getTelegramChatId())
+            .replyMarkup(
+                InlineKeyboardMarkup
+                    .builder()
+                    .keyboardRow(new InlineKeyboardRow(removeButton))
+                    .build()
+            )
+            .text(txt)
+            .build();
+        client.execute(sendMessage);
     }
 
     @Override
@@ -153,9 +177,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                         }
                         group.add(message);
                     }
-                    else {
-                        handleLoneMessage(message);
-                    }
+                    else { handleLoneMessage(message); }
                 }
                 else if(update.hasCallbackQuery()) {
                     handleCallbackQuery(update.getCallbackQuery());
@@ -336,7 +358,12 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         }
         else {
             try {
-                BotUserRegistrationHandler.registerTelegramUser(message.getFrom().getId(), message.getChatId(), token);
+                Integer userId =  Authenticator.verifyOtpToken(token);
+                FlashBackUser user = new FlashBackUser();
+                user.setUserId(userId);
+                user.setTelegramChatId(message.getChatId());
+                user.setTelegramUserId(message.getFrom().getId());
+                Database.updateUser(userId, user);
                 sendPlainMessage(message.getChatId(),
                     "Welcome. You can now send notes. And also see notes sent from elsewhere here");
             }
