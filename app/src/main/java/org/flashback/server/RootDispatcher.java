@@ -23,9 +23,11 @@ public class RootDispatcher implements Runnable {
         handlers.put("getme", GetMeHandler::handle);
         handlers.put("addnote", AddNoteHandler::handle);
         handlers.put("getnote", GetNoteHandler::handle);
+        handlers.put("modnote", UpdateNoteHandler::handle);
         handlers.put("rmnote", DeleteNoteHandler::handle);
         handlers.put("download", FileDownloadHandler::handle);
-        handlers.put("addfile", AddFilesToNoteHandler::handle);
+        handlers.put("getfeed", FileDownloadHandler::handle);
+        handlers.put("search", SearchHandler::handle);
     }
 
     @Override
@@ -33,12 +35,12 @@ public class RootDispatcher implements Runnable {
         while (!Thread.interrupted()) {
             try( RequestResponsePair exchange = queue.take()) {
 
-                if(!exchange.getRequest().getMethod().equals("POST")) {
+                if(!exchange.request.getMethod().equals("POST")) {
                     GenericHandler.handleException(exchange, new FlashbackException(HttpStatus.METHOD_NOT_ALLOWED_405, "expected POST request"));
                     continue;
                 }
 
-                String path = exchange.getRequest().getRequestURI().substring(1);
+                String path = exchange.request.getRequestURI().substring(1);
                 var handler = handlers.get(path);
 
                 if(handler == null) {

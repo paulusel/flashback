@@ -29,7 +29,7 @@ public class GenericHandler {
     }
 
     public static void handleException(RequestResponsePair exchange, FlashbackException e) {
-        exchange.getResponse().reset();
+        exchange.response.reset();
         ServerResponse response = new MessageResponse(false, e.getStatusCode(), e.getMessage());
         sendResponse(response, exchange);
     }
@@ -42,11 +42,11 @@ public class GenericHandler {
     }
 
     public static void sendResponse(ServerResponse response, RequestResponsePair exchange) {
-        exchange.getResponse().setHeader("Content-Type", "application/json");
-        exchange.getResponse().setStatus(response.getStatusCode());
+        exchange.response.setHeader("Content-Type", "application/json");
+        exchange.response.setStatus(response.getStatusCode());
         String json = Json.serialize(response);
 
-        try( var out = exchange.getResponse().getOutputStream();) {
+        try( var out = exchange.response.getOutputStream();) {
             out.write(json.getBytes());
         }
         catch(IOException e) {
@@ -56,13 +56,12 @@ public class GenericHandler {
 
     public static void sendFile(RequestResponsePair exchange, NoteFile mFile) throws IOException {
         var file = Path.of(Config.getValue("uploads_dir")).resolve(mFile.getFileId()).toFile();
-        var response = exchange.getResponse();
         try(FileInputStream in = new FileInputStream(file)){
-            response.setStatus(HttpStatus.OK_200);
-            response.setHeader("Content-Type", mFile.getMimeType());
-            response.setHeader("Content-Disposition", String.format("inline; filename=\"%s\"", mFile.getFileName()));
-            response.setHeader("Content-Length", String.valueOf(mFile.getSize()));
-            in.transferTo(response.getOutputStream());
+            exchange.response.setStatus(HttpStatus.OK_200);
+            exchange.response.setHeader("Content-Type", mFile.getMimeType());
+            exchange.response.setHeader("Content-Disposition", String.format("inline; filename=\"%s\"", mFile.getFileName()));
+            exchange.response.setHeader("Content-Length", String.valueOf(mFile.getSize()));
+            in.transferTo(exchange.response.getOutputStream());
         }
     }
 

@@ -13,9 +13,9 @@ public class GetNoteHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try {
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
-            GenericHandler.checkJsonBody(exchange.getRequest());
-            String json = GenericHandler.requestBodyString(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.request);
+            GenericHandler.checkJsonBody(exchange.request);
+            String json = GenericHandler.requestBodyString(exchange.request);
             int noteId = Json.deserialize(json, int.class);
             FlashBackNote note = Database.getNote(userId, noteId);
             GenericHandler.sendResponse(new NoteResponse(true, HttpStatus.OK_200, note), exchange);

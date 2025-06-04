@@ -15,7 +15,7 @@ public class GetMeHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try {
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.request);
             FlashBackUser me = Database.getUser(userId);
 
             if(me == null) {

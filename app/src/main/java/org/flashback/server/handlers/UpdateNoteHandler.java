@@ -17,23 +17,32 @@ public class UpdateNoteHandler {
     public static void handle(RequestResponsePair exchange) {
         FlashBackNote note = null;
         try {
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.request);
             try {
-                note = NoteProcessor.extractNoteFromForm(exchange.getRequest());
-                Database.addOrUpdateNote(userId, note);
-                NoteProcessor.postProcessFiles(userId, note);
+                note = NoteProcessor.extractNoteFromForm(exchange.request);
+                if(note.getNoteId() == null) {
+                    throw new FlashbackException("noteId is note specfied in the form");
+                }
+
+                Database.updateNote(userId, note);
+                if(!note.getFiles().isEmpty()) {
+                    NoteProcessor.postProcessFiles(userId, note);
+                }
             }
-            catch(Exception e) {
+            catch(FlashbackException e) {
                 if(note != null) {
                     NoteProcessor.cleanFiles(userId, note);
                 }
+                throw e;
             }
 
-            try{
+            try {
                 FlashBackUser user = Database.getUser(userId);
                 if(user.getTelegramChatId() != null) {
                     note = FlashBackBot.sendNote(user, note.getNoteId());
-                    Database.updateNote(userId, note);
+                    if(!note.getFiles().isEmpty()) {
+                        Database.updateNote(userId, note);
+                    }
                 }
             }
             catch(Exception e) {

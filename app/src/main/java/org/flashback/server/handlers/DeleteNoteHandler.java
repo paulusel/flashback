@@ -11,9 +11,9 @@ import org.flashback.helpers.*;
 public class DeleteNoteHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
-            GenericHandler.checkJsonBody(exchange.getRequest());
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
-            String json = GenericHandler.requestBodyString(exchange.getRequest());
+            GenericHandler.checkJsonBody(exchange.request);
+            Integer userId = Authenticator.authenticate(exchange.request);
+            String json = GenericHandler.requestBodyString(exchange.request);
             int noteId = Json.deserialize(json, int.class);
             Database.deleteNote(userId, noteId);
             MessageResponse response = new MessageResponse(true, HttpStatus.OK_200, "deleted");

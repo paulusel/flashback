@@ -12,7 +12,7 @@ public class DeleteAccountHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try{
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.request);
             Database.deleteUser(userId);
             MessageResponse response = new MessageResponse(true, HttpStatus.NO_CONTENT_204, "deleted");
             GenericHandler.sendResponse(response, exchange);

@@ -12,7 +12,7 @@ public class GenerateBotLinkHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try {
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.request);
             String otpToken = Authenticator.generateOtpToken(userId);
             String botAddress = FlashBackBot.getBotUserName();
             String link = "https://t.me/" + botAddress + "?start=" + otpToken;

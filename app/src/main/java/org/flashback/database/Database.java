@@ -1,5 +1,6 @@
 package org.flashback.database;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jetty.http.HttpStatus;
@@ -342,6 +343,12 @@ public class Database {
     }
 
     public static List<FlashBackNote> searchNotes(Integer userId, String keyword) throws FlashbackException {
-        return null;
+        List<FlashBackNote> notes = new ArrayList<>();
+        return notes;
+    }
+
+    public static List<FlashBackNote> getFeed(Integer userId, Long timestamp) throws FlashbackException {
+        List<FlashBackNote> notes = new ArrayList<>();
+        return notes;
     }
 }

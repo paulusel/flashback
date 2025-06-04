@@ -179,53 +179,65 @@ public class NoteProcessor {
         }
     }
 
-    public static void postProcessFiles(Integer userId, FlashBackNote note) throws Exception {
-        Path user_dir = destDir.resolve(String.valueOf(userId));
-        if(!Files.exists(user_dir)) {
-            Files.createDirectory(user_dir);
-        }
-
-        for(NoteFile file: note.getFiles()) {
-            Path src = tempDir.resolve(file.getFileName());
-            Path dest_dir = user_dir.resolve(file.getFileId());
-            Files.createDirectory(dest_dir);
-            Path dest = dest_dir.resolve(file.getFileName());
-            Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
-
-            if(VIDEO_EXTENSIONS.contains(file.getExtension())) {
-                ffmpegProcessVideo(dest);
+    public static void postProcessFiles(Integer userId, FlashBackNote note) throws FlashbackException {
+        try {
+            Path user_dir = destDir.resolve(String.valueOf(userId));
+            if(!Files.exists(user_dir)) {
+                Files.createDirectory(user_dir);
             }
+
+            for(NoteFile file: note.getFiles()) {
+                Path src = tempDir.resolve(file.getFileName());
+                Path dest_dir = user_dir.resolve(file.getFileId());
+                Files.createDirectory(dest_dir);
+                Path dest = dest_dir.resolve(file.getFileName());
+                Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
+
+                if(VIDEO_EXTENSIONS.contains(file.getExtension())) {
+                    ffmpegProcessVideo(dest);
+                }
+            }
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+            throw new FlashbackException();
         }
     }
 
-    private static void ffmpegProcessVideo(Path video_path) throws Exception {
-        String filename = video_path.toString();
-        String output_path = FilenameUtils.getBaseName(filename);
+    private static void ffmpegProcessVideo(Path video_path) throws FlashbackException {
+        try {
+            String filename = video_path.toString();
+            String output_path = FilenameUtils.getBaseName(filename);
 
-        List<String> command = Arrays.asList(
-            "ffmpeg", "-i", filename,
-            "-c:v", "libx264",
-            "-crf", "23",
-            "-preset", "veryfast",
-            "-profile:v", "main",
-            "-level", "3.1",
-            "-vf", "scale=-2:720",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-g", "60",
-            "-keyint_min", "60",
-            "-sc_threshold", "0",
-            "-f", "hls",
-            "-hls_time", "6",
-            "-hls_list_size", "0",
-            "-hls_playlist_type", "vod",
-            "-hls_segment_filename", output_path + "/%d.ts",
-            output_path + "/playlist.m3u8"
-        );
+            List<String> command = Arrays.asList(
+                "ffmpeg", "-i", filename,
+                "-c:v", "libx264",
+                "-crf", "23",
+                "-preset", "veryfast",
+                "-profile:v", "main",
+                "-level", "3.1",
+                "-vf", "scale=-2:720",
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-g", "60",
+                "-keyint_min", "60",
+                "-sc_threshold", "0",
+                "-f", "hls",
+                "-hls_time", "6",
+                "-hls_list_size", "0",
+                "-hls_playlist_type", "vod",
+                "-hls_segment_filename", output_path + "/%d.ts",
+                output_path + "/playlist.m3u8"
+            );
 
-        ProcessBuilder pb = new ProcessBuilder(command);
-        Process process = pb.start();
-        int exitCode = process.waitFor();
-        if(exitCode != 0) throw new Exception();
+            ProcessBuilder pb = new ProcessBuilder(command);
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            if(exitCode != 0) throw new Exception();
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 }

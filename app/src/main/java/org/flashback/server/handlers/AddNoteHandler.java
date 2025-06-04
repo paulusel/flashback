@@ -14,10 +14,10 @@ import org.flashback.telegram.FlashBackBot;
 public class AddNoteHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
-            Integer userId = Authenticator.authenticate(exchange.getRequest());
+            Integer userId = Authenticator.authenticate(exchange.request);
             FlashBackNote note = null;
             try {
-                note = NoteProcessor.extractNoteFromForm(exchange.getRequest());
+                note = NoteProcessor.extractNoteFromForm(exchange.request);
                 Database.addNoteAndAssignId(userId, note);
                 NoteProcessor.postProcessFiles(userId, note);
             }

@@ -14,8 +14,8 @@ public class LoginHandler {
 
     public static void handle(RequestResponsePair exchange) {
         try {
-            GenericHandler.checkJsonBody(exchange.getRequest());
-            String json = GenericHandler.requestBodyString(exchange.getRequest());
+            GenericHandler.checkJsonBody(exchange.request);
+            String json = GenericHandler.requestBodyString(exchange.request);
             FlashBackUser user = Json.deserialize(json, FlashBackUser.class);
             if(user.getUserName() == null || user.getPassword() == null) {
                 throw new FlashbackException("username or password missing");
