@@ -1,5 +1,7 @@
 package org.flashback.database;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +38,8 @@ public class Database {
     public static FlashBackUser getUserByUserId(Integer userId) throws FlashbackException {
         try(var conn = ds.getConnection()) {
 
-            var stmnt = conn.prepareStatement("SELECT username, telegram_user_id FROM users WHERE username = ?");
+            var stmnt = conn.prepareStatement(
+                "SELECT username, telegram_user_id, telegram_chat_id FROM users WHERE user_id = ?");
             stmnt.setInt(1, userId);
             var result = stmnt.executeQuery();
 
@@ -45,15 +48,14 @@ public class Database {
             }
 
             var usr = new FlashBackUser();
+            usr.setUserId(userId);
             usr.setUserName(result.getString(1));
             usr.setTelegramUserId(result.getLong(2));
+            usr.setTelegramChatId(result.getLong(3));
             return usr;
 
         }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
@@ -66,20 +68,23 @@ public class Database {
                 throw new FlashbackException("username or password missing");
             }
 
-            var stmnt = conn.prepareStatement("SELECT password FROM users WHERE username = ?");
+            var stmnt = conn.prepareStatement(
+                "SELECT password, user_id, telegram_user_id, telegram_chat_id FROM users WHERE username = ?");
             stmnt.setString(1, user.getUserName());
             var result = stmnt.executeQuery();
+
             if(!result.next() || !BCrypt.checkpw(user.getPassword(), result.getString(1))) {
                 throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "incorrect username or password");
             }
-            // TODO: add other data to user if necessary
+
+            user.setUserId(result.getInt(2));
+            user.setTelegramUserId(result.getLong(3));
+            user.setTelegramChatId(result.getLong(4));
+
             return user;
 
         }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
@@ -94,29 +99,28 @@ public class Database {
                 throw new FlashbackException(HttpStatus.NOT_FOUND_404, "user not found");
             }
         }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
     }
 
-    public static void addNewUser(FlashBackUser user) throws FlashbackException {
+    public static FlashBackUser addNewUser(FlashBackUser user) throws FlashbackException {
         if(user.getUserName() == null || user.getPassword() == null) {
             throw new FlashbackException("missing password or username");
         }
 
         try (var conn = ds.getConnection()){
             String passwordHash = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt(10));
-            var stmnt = conn.prepareStatement("INSERT INTO users (username, password, telegram_user_id) VALUES (?, ?, ?)");
+            var stmnt = conn.prepareStatement("INSERT INTO users (username, password) VALUES (?, ?) RETURNING user_id");
             stmnt.setString(1, user.getUserName());
             stmnt.setString(2, passwordHash);
-            stmnt.setLong(3, user.getTelegramUserId());
-            stmnt.execute();
+            var result = stmnt.executeQuery();
+            result.next();
+            user.setUserId(result.getInt(1));
+            return user;
         }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
@@ -124,87 +128,119 @@ public class Database {
 
     public static void addNoteAndAssignId(Integer userId, FlashBackNote note) throws FlashbackException {
         try(var conn = ds.getConnection()) {
-            var memoInsertStmnt = conn.prepareStatement(
-                "INSERT INTO memo_items (type, parent, name, note, username) VALUES (?,?,?,?,?) RETURNING item_id");
-            memoInsertStmnt.setInt(5, userId);
-            var fileInsertStmnt = conn.prepareStatement("INSERT INTO memo_files (item_id, file_id) VALUES (?,?)");
-            var tagInsertStmnt = conn.prepareStatement("INSERT INTO tags (item_id, tag) VALUES (?,?)");
+            var noteInsertStmnt = conn.prepareStatement("INSERT INTO notes (owner_id, note) VALUES (?,?) RETURNING note_id");
+            noteInsertStmnt.setInt(1, userId);
+            noteInsertStmnt.setString(2, note.getNote());
 
-            memoInsertStmnt.setString(4, note.getNote());
-
-            var result = memoInsertStmnt.executeQuery();
+            var result = noteInsertStmnt.executeQuery();
             result.next();
-            Integer noteId = result.getInt(1);
+            note.setNoteId(result.getInt(1));
 
             if(note.getFiles() != null) {
-                fileInsertStmnt.setInt(1, noteId);
-                for(var file : note.getFiles()) {
-                    fileInsertStmnt.setString(2, file.getFileId());
-                    fileInsertStmnt.addBatch();
-                }
-                fileInsertStmnt.executeBatch();
-                // TODO: fileIds need to copy back to the note
+                insertNoteFiles(conn, note.getNoteId(), note.getFiles());
             }
 
             if(note.getTags() != null){
-                tagInsertStmnt.setInt(1, noteId);
-                for(var tag : note.getTags()) {
-                    tagInsertStmnt.setString(2, tag);
-                    tagInsertStmnt.addBatch();
-                }
-                tagInsertStmnt.executeBatch();
+                insertNoteTags(conn, note.getNoteId(), note.getTags());
             }
-
-            note.setNoteId(noteId);
         }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
     }
 
+    private static void insertNoteFiles(Connection conn, Integer noteId, List<NoteFile> files) throws SQLException {
+        var noteFileInsertStmnt = conn.prepareStatement("INSERT INTO note_files (note_id, file_id) VALUES (?,?)");
+        noteFileInsertStmnt.setInt(1, noteId);
+
+        var fileInsertStmnt = conn.prepareStatement(
+            "INSERT INTO files (file_id, extension, mime_type, size, telegram_file_id) VALUES (?,?,?,?,?)");
+        for(var file : files) {
+            fileInsertStmnt.setString(1, file.getFileId());
+            fileInsertStmnt.setString(2, file.getExtension());
+            fileInsertStmnt.setString(3, file.getMimeType());
+            fileInsertStmnt.setLong(4, file.getSize());
+            fileInsertStmnt.setString(5, file.getTelegramFileId());
+            fileInsertStmnt.addBatch();
+
+            noteFileInsertStmnt.setString(2, file.getFileId());
+            noteFileInsertStmnt.addBatch();
+        }
+        fileInsertStmnt.executeBatch();
+        noteFileInsertStmnt.executeBatch();
+    }
+
+    private static void insertNoteTags(Connection conn, Integer noteId, List<String> tags) throws SQLException {
+        var tagInsertStmnt = conn.prepareStatement("INSERT INTO tags (note_id, tag) VALUES (?,?)");
+        tagInsertStmnt.setInt(1, noteId);
+
+        for(var tag : tags) {
+            tagInsertStmnt.setString(2, tag);
+            tagInsertStmnt.addBatch();
+        }
+        tagInsertStmnt.executeBatch();
+    }
+
     public static FlashBackNote getNote(Integer userId, Integer noteId) throws FlashbackException {
         try(var conn = ds.getConnection()) {
-            var stmnt = conn.prepareStatement(
-                "SELECT username, type, name, parent, note, modified  FROM memo_items WHERE item_id = ?");
-                            stmnt.setInt(1, noteId);
-                var result = stmnt.executeQuery();
-                if(!result.next()) {
-                    throw new FlashbackException(HttpStatus.NOT_FOUND_404, "note not found: [" + noteId + "]");
-                }
+            var stmnt = conn.prepareStatement( "SELECT note, modified, created  FROM notes WHERE note_id = ? AND owner_id = ?");
+            stmnt.setInt(1, noteId);
+            stmnt.setInt(2, userId);
+            var result = stmnt.executeQuery();
 
-                if(!userId.equals(result.getInt(1))) {
-                    throw new FlashbackException(HttpStatus.UNAUTHORIZED_401,
-                        "unauthorized to access note: [" + noteId + "]");
-                }
+            if(!result.next()) {
+                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "note not found: [" + noteId + "]");
+            }
 
-                FlashBackNote note = new FlashBackNote();
-                note.setNote(result.getString(5));
-                note.setModified(result.getTimestamp(6));
+            FlashBackNote note = new FlashBackNote();
+            note.setNote(result.getString(1));
+            note.setModified(result.getTimestamp(2));
+            note.setModified(result.getTimestamp(3));
+            loadNoteFiles(conn, note);
+            loadNoteTags(conn, note);
             return note;
         }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
+        }
+    }
+
+    private static void loadNoteFiles(Connection conn, FlashBackNote note) throws SQLException {
+        var stmnt = conn.prepareStatement("SELECT file_id, extension, mime_type, size, telegram_file_id " + 
+            " FROM files JOIN note_files USING (file_id) WHERE note_files.note_id = ?");
+        stmnt.setInt(1, note.getNoteId());
+        var result = stmnt.executeQuery();
+        while(result.next()) {
+            NoteFile file = new NoteFile();
+            file.setFileId(result.getString(1));
+            file.setExtension(result.getString(2));
+            file.setMimeType(result.getString(3));
+            file.setSize(result.getLong(4));
+            file.setTelegramFileId(result.getString(5));
+            note.getFiles().addLast(file);
+        }
+    }
+
+    private static void loadNoteTags(Connection conn, FlashBackNote note) throws SQLException {
+        var stmnt = conn.prepareStatement("SELECT tag FROM tags JOIN note_tags USING (file_id) WHERE note_tags.note_id = ?");
+        stmnt.setInt(1, note.getNoteId());
+        var result = stmnt.executeQuery();
+        while(result.next()) {
+            note.getTags().add(result.getString(1));
         }
     }
 
     public static void deleteNote(Integer userId, Integer noteId) throws FlashbackException {
         try(var conn = ds.getConnection()) {
-            var stmnt = conn.prepareStatement("DELETE FROM memo_items WHERE item_id = ? RETURNING username");
+            var stmnt = conn.prepareStatement("DELETE FROM notes WHERE note_id = ? AND owner_id = ?");
             stmnt.setInt(1, noteId);
-            var result = stmnt.executeQuery();
-            if(result.next() && result.getInt(1) != userId) {
+            if(stmnt.executeUpdate() == 0) {
                 throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "not authorized to take action");
             }
         }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
@@ -229,54 +265,51 @@ public class Database {
             file.setMimeType(result.getString(4));
             return file;
         }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-            throw new FlashbackException();
-        }
-    }
-
-    public static void addFiles(Integer userId, List<NoteFile> files) throws FlashbackException {
-        try (var conn = ds.getConnection()) {
-            //inset file
-            var ownerInsertStmnt = conn.prepareStatement(
-                "INSERT INTO file_owners (username, file_id) VALUES (?, ?) ON CONFLICT (username, file_id) DO NOTHING"
-            );
-            ownerInsertStmnt.setInt(1, userId);
-
-            var fileInsertStmnt = conn.prepareStatement(
-                "INSERT INTO files (file_id, telegram_file_id, original_name, mime_type, size)"
-                + "VALUES (?, ?, ?, ?, ?) ON CONFLICT (file_id) DO NOTHING"
-            );
-            for(var file : files) {
-                fileInsertStmnt.setString(1, file.getFileId());
-                fileInsertStmnt.setString(2, file.getTelegramFileId());
-                fileInsertStmnt.setString(4, file.getMimeType());
-                fileInsertStmnt.setLong(5, file.getSize());
-
-                ownerInsertStmnt.setString(2, file.getFileId());
-
-                fileInsertStmnt.addBatch();
-                ownerInsertStmnt.addBatch();
-            }
-
-            fileInsertStmnt.executeBatch();
-            ownerInsertStmnt.executeBatch();
-        }
-        catch(Exception e) {
+        catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
     }
 
     public static FlashBackUser getUserByChatId(Long chatId) throws FlashbackException {
-        return new FlashBackUser();
+        try(var conn = ds.getConnection()) {
+            var stmnt = conn.prepareStatement(
+                "SELECT user_id, username, telegram_user_id FROM users WHERE telegram_chat_id = ?");
+            stmnt.setLong(1, chatId);
+            var result = stmnt.executeQuery();
+            if(!result.next()) {
+                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "user note found");
+            }
+            FlashBackUser user = new FlashBackUser();
+            user.setTelegramChatId(chatId);
+            user.setUserId(result.getInt(1));
+            user.setUserName(result.getString(2));
+            user.setTelegramUserId(result.getLong(3));
+            return user;
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 
     public static void updateNote(Integer userId, FlashBackNote note) throws FlashbackException {
+        try(var conn = ds.getConnection()) {
+            getNote(userId, note.getNoteId()); // verifies the user owns the note
 
+            if(note.getNote() != null) {
+                var stmnt = conn.prepareStatement("UPDATE notes SET note = ? WHERE note_id = ?");
+                stmnt.setString(1, note.getNote());
+                stmnt.setInt(2, note.getNoteId());
+                stmnt.executeUpdate();
+            }
+            insertNoteFiles(conn, note.getNoteId(), note.getFiles());
+            insertNoteTags(conn, note.getNoteId(), note.getTags());
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 
     public static void updateUser(Integer userId, FlashBackUser user) throws FlashbackException {

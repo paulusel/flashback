@@ -21,6 +21,7 @@ public class RootDispatcher implements Runnable {
         handlers.put("deleteme", DeleteAccountHandler::handle);
         handlers.put("login", LoginHandler::handle);
         handlers.put("getme", GetMeHandler::handle);
+        handlers.put("botlink", GenerateBotLinkHandler::handle);
         handlers.put("addnote", AddNoteHandler::handle);
         handlers.put("getnote", GetNoteHandler::handle);
         handlers.put("modnote", UpdateNoteHandler::handle);
