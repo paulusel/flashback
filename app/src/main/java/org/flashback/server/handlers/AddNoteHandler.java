@@ -28,7 +28,7 @@ public class AddNoteHandler {
                 throw e;
             }
             try{
-                FlashBackUser user = Database.getUser(userId);
+                FlashBackUser user = Database.getUserByUserId(userId);
                 if(user.getTelegramChatId() != null) {
                     note = FlashBackBot.sendNote(user, note.getNoteId());
                     Database.updateNote(userId, note);

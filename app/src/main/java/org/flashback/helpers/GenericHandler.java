@@ -54,13 +54,13 @@ public class GenericHandler {
         }
     }
 
-    public static void sendFile(RequestResponsePair exchange, NoteFile mFile) throws IOException {
-        var file = Path.of(Config.getValue("uploads_dir")).resolve(mFile.getFileId()).toFile();
+    public static void sendFile(RequestResponsePair exchange, NoteFile nFile) throws IOException {
+        var file = Path.of(Config.getValue("uploads_dir")).resolve(nFile.getFileId()).toFile();
         try(FileInputStream in = new FileInputStream(file)){
             exchange.response.setStatus(HttpStatus.OK_200);
-            exchange.response.setHeader("Content-Type", mFile.getMimeType());
-            exchange.response.setHeader("Content-Disposition", String.format("inline; filename=\"%s\"", mFile.getFileName()));
-            exchange.response.setHeader("Content-Length", String.valueOf(mFile.getSize()));
+            exchange.response.setHeader("Content-Type", nFile.getMimeType());
+            exchange.response.setHeader("Content-Disposition", String.format("inline; filename=\"%s\"", nFile.getFileName()));
+            exchange.response.setHeader("Content-Length", String.valueOf(nFile.getSize()));
             in.transferTo(exchange.response.getOutputStream());
         }
     }

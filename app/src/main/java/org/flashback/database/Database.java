@@ -7,7 +7,6 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.helpers.Config;
 import org.flashback.types.FlashBackUser;
-import org.flashback.types.FileAddRemoveRequest;
 import org.flashback.types.NoteFile;
 import org.flashback.types.FlashBackNote;
 import org.mindrot.jbcrypt.BCrypt;
@@ -34,7 +33,7 @@ public class Database {
         ds = new HikariDataSource(config);
     }
 
-    public static FlashBackUser getUser(Integer userId) throws FlashbackException {
+    public static FlashBackUser getUserByUserId(Integer userId) throws FlashbackException {
         try(var conn = ds.getConnection()) {
 
             var stmnt = conn.prepareStatement("SELECT username, telegram_user_id FROM users WHERE username = ?");
@@ -209,55 +208,6 @@ public class Database {
             e.printStackTrace();
             throw new FlashbackException();
         }
-    }
-
-    public static void addNoteFiles(Integer userId, FileAddRemoveRequest[] requests) throws FlashbackException {
-        try(var conn = ds.getConnection()) {
-            var stmnt = conn.prepareStatement("INSERT INTO memo_files (item_id, file_id) VALUES (? , ?)");
-            var owenerCheckStmnt = conn.prepareStatement("SELECT username FROM file_owners WHERE file_id = ? AND username = ?");
-            for(var request : requests) {
-                if(request.getNoteId() == null || request.getFileId() == null) {
-                    throw new FlashbackException("invalid request: itemId or fileId missing");
-                }
-
-                owenerCheckStmnt.setString(1, request.getFileId());
-                owenerCheckStmnt.setLong(2, userId);
-                var owner = owenerCheckStmnt.executeQuery();
-
-                if(!owner.next()) {
-                    throw new FlashbackException(HttpStatus.NOT_FOUND_404, "file not found");
-                }
-
-                stmnt.setInt(1, request.getNoteId());
-                stmnt.setString(2, request.getFileId());
-                stmnt.addBatch();
-            }
-            stmnt.executeBatch();
-        }
-        catch(FlashbackException e) {
-            throw e;
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-            throw new FlashbackException();
-        }
-    }
-
-    public static void removeNoteFiles(Integer userId, FileAddRemoveRequest[] requests) throws FlashbackException {
-        try (var conn = ds.getConnection()) {
-            var stmnt = conn.prepareStatement("DELETE FROM memo_files WHERE item_id = ? AND file_id = ?");
-            for(var request : requests) {
-                stmnt.setInt(1, request.getNoteId());
-                stmnt.setString(2, request.getFileId());
-                stmnt.addBatch();
-            }
-            stmnt.executeBatch();
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-            throw new FlashbackException();
-        }
-
     }
 
     public static NoteFile getFile(Integer userId, String fileId) throws FlashbackException {

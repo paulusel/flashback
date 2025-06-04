@@ -1,12 +1,9 @@
 package org.flashback.types;
 
-/**
- * User
- */
 public class FlashBackUser {
 
-    private String username;
     private Integer userId;
+    private String username;
     private String password;
     transient private Long telegramChatId;
     transient private Long telegramUserId;

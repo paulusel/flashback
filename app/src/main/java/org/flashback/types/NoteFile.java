@@ -8,9 +8,6 @@ public class NoteFile {
     private Long size;
     transient private String telegramFileId;
 
-    public NoteFile() {
-    };
-
     public String getFileId() {
         return fileId;
     }
@@ -52,6 +49,6 @@ public class NoteFile {
     }
 
     public String getFileName() {
-        return this.getTelegramFileId() + "." + this.getExtension();
+        return this.getFileId() + "." + this.getExtension();
     }
 }

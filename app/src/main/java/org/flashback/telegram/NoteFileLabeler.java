@@ -8,6 +8,7 @@ import java.util.List;
 import org.flashback.helpers.Config;
 import org.flashback.types.FlashBackUser;
 import org.flashback.types.NoteFile;
+
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaAudio;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
@@ -15,8 +16,8 @@ import org.telegram.telegrambots.meta.api.objects.media.InputMediaVideo;
 
 public class NoteFileLabeler {
     public static List<NoteFileCategory> categorize(FlashBackUser user, List<NoteFile> files) {
-
         List<NoteFileCategory> categories = new ArrayList<>();
+
         var audios = new NoteFileCategory(NoteFileCategory.FileCategory.AUDIO);
         var visuals = new NoteFileCategory(NoteFileCategory.FileCategory.VISUAL);
         var documents = new NoteFileCategory(NoteFileCategory.FileCategory.DOCUMENT);
@@ -58,9 +59,9 @@ public class NoteFileLabeler {
             }
         }
 
+        if(!documents.media.isEmpty()) categories.add(documents);
         if(!audios.media.isEmpty()) categories.add(audios);
         if(!visuals.media.isEmpty()) categories.add(visuals);
-        if(!documents.media.isEmpty()) categories.add(documents);
 
         return categories;
     }

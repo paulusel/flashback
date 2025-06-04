@@ -37,7 +37,7 @@ public class UpdateNoteHandler {
             }
 
             try {
-                FlashBackUser user = Database.getUser(userId);
+                FlashBackUser user = Database.getUserByUserId(userId);
                 if(user.getTelegramChatId() != null) {
                     note = FlashBackBot.sendNote(user, note.getNoteId());
                     if(!note.getFiles().isEmpty()) {

@@ -12,8 +12,6 @@ public class FlashBackNote {
     private List<String> tags = new ArrayList<>();
     private List<NoteFile> files = new ArrayList<>();
 
-    public FlashBackNote() {}
-
     public Integer getNoteId() {
         return noteId;
     }
