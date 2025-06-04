@@ -24,7 +24,7 @@ public class Authenticator {
     private static PrivateKey privateKey;
     private static PublicKey publicKey;
     private static int expiry;
-    public static void loadConfig() throws Exception {
+    public static void init() throws Exception {
         String exp = Config.getValue("jwt_token_expiry");
         if(exp == null || exp.isEmpty()) exp = "720";
         expiry = Integer.valueOf(exp) * 3600;

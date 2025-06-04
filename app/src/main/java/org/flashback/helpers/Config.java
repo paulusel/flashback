@@ -22,8 +22,7 @@ public class Config {
 
     public static final List<String> file_keys = Arrays.asList("public_key", "private_key", "uploads_dir", "temp_dir");
 
-    public static void init(String filename) throws Exception {
-        Path configFile = Path.of(filename);
+    public static void init(Path configFile) throws Exception {
         try(
             FileReader reader = new FileReader(configFile.toString());
             BufferedReader lineReader = new BufferedReader(reader))

@@ -1,8 +1,6 @@
 package org.flashback.server;
 
-import org.flashback.auth.Authenticator;
 import org.flashback.helpers.Config;
-import org.flashback.helpers.NoteProcessor;
 import org.flashback.types.RequestResponsePair;
 
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
@@ -13,52 +11,32 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.ArrayList;
 
 public class FlashBackServer {
-    private static FlashBackServer server;
+    private static int port;
+    private static int nThreads;
+    private static int queueSize;
 
-    private int port;
-    private int nThreads;
-    private int queueSize;
+    private static final BlockingQueue<RequestResponsePair> queue = new ArrayBlockingQueue<>(queueSize);
+    private static Server httpServer = new Server(port);
+    private static final ArrayList<Thread> threads = new ArrayList<>();
 
-    private final BlockingQueue<RequestResponsePair> queue = new ArrayBlockingQueue<>(queueSize);
-    private Server httpServer = new Server(port);
-    private final ArrayList<Thread> threads = new ArrayList<>();
-
-    public static void init() throws Exception {
-        if(server == null) {
-            Authenticator.loadConfig();
-            NoteProcessor.init();
-            server = new FlashBackServer();
-        }
-    }
-
-    public static FlashBackServer getServer() throws Exception {
-        if(server == null) {
-            throw new Exception("server is null");
-        }
-
-        return server;
-    }
-
-    private FlashBackServer() throws Exception {
-        this.port = Integer.valueOf(Config.getValue("server_port"));
+    public static void start() throws Exception{
+        FlashBackServer.port = Integer.valueOf(Config.getValue("server_port"));
 
         String queueSize = Config.getValue("server_queue_size");
         String nThreads = Config.getValue("server_nthreads");
         if(queueSize == null || queueSize.isEmpty()) queueSize = "100";
         if(nThreads == null || nThreads.isEmpty()) nThreads = "2";
 
-        this.queueSize = Integer.valueOf(Config.getValue("server_queue_size"));
-        this.nThreads = Integer.valueOf(Config.getValue("server_nthreads"));
-    };
+        FlashBackServer.queueSize = Integer.valueOf(queueSize);
+        FlashBackServer.nThreads = Integer.valueOf(nThreads);
 
-    public void startService() throws Exception{
 
         ServletContextHandler context = new ServletContextHandler();
         context.setContextPath("/");
         context.addServlet(new FlashbackHttpServlet(queue), "/*");
         httpServer.setHandler(context);
 
-        for(int i = 0; i < nThreads; ++i) {
+        for(int i = 0; i < FlashBackServer.nThreads; ++i) {
             Thread consumer = new Thread(new RootDispatcher(queue));
             threads.add(consumer);
             consumer.start();
@@ -67,7 +45,9 @@ public class FlashBackServer {
         httpServer.start();
     }
 
-    public void stopService() throws Exception{
+    public static void stop() throws Exception{
+        if(httpServer != null) return;
+
         httpServer.stop();
         for(var thread : threads) {
             // Do something to thread to stop it

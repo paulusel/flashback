@@ -12,35 +12,18 @@ import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 
 public class FlashBackBot {
 
-    private static FlashBackBot bot;
+    private static TelegramClient client;
+    private static TelegramBotsLongPollingApplication botApp;
+    private static BotActionHandler botActionHandler;
+    private static String token;
 
-    private TelegramClient client;
-    private TelegramBotsLongPollingApplication botApp;
-    private BotActionHandler botActionHandler;
-    private String token;
+    public static void start() throws Exception {
+        FlashBackBot.token = Config.getValue("bot_token");
+        FlashBackBot.client = new OkHttpTelegramClient(token);
+        FlashBackBot.botActionHandler = new BotActionHandler(client, token);
 
-    private FlashBackBot(String token) {
-        this.token = token;
-        this.client = new OkHttpTelegramClient(token);
-        this.botActionHandler = new BotActionHandler(client, token);
-    }
-
-    public static void init() throws Exception {
-        if(bot != null) return;
-        FlashBackBot bt = new FlashBackBot(Config.getValue("bot_token"));
-        bot = bt;
-    }
-
-    public static FlashBackBot getBot() throws Exception {
-        if(bot == null) {
-            throw new Exception("bot is null");
-        }
-        return bot;
-    }
-
-    public void start() throws Exception {
-        this.botApp = new TelegramBotsLongPollingApplication();
         try {
+            botApp = new TelegramBotsLongPollingApplication();
             botApp.registerBot(token, botActionHandler);
         }
         catch(TelegramApiException e) {
@@ -48,20 +31,16 @@ public class FlashBackBot {
         }
     }
 
-    public void stop() throws Exception {
-        this.botApp.close();
+    public static void stop() throws Exception {
+        botApp.close();
     }
 
-    public TelegramClient getClient() {
-        return client;
-    }
-
-    public FlashBackNote sendNote(FlashBackUser user, Integer noteId) throws Exception {
+    public static FlashBackNote sendNote(FlashBackUser user, Integer noteId) throws Exception {
         FlashBackNote note = Database.getNote(user.getUserId(), noteId);
         return botActionHandler.sendNote(user, note);
     }
 
-    public String getBotUserName() throws Exception {
+    public static String getBotUserName() throws Exception {
         return botActionHandler.getBotUserName();
     }
 }

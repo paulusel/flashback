@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.flashback.helpers.*;
+import org.flashback.helpers.GenericHandler;
 import org.flashback.types.MessageResponse;
 import org.flashback.types.RequestResponsePair;
 
