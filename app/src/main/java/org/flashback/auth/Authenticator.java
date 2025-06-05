@@ -14,11 +14,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Cookie;
 
 import java.security.KeyFactory;
-import java.io.FileInputStream;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.security.*;
 
 public class Authenticator {
     private static PrivateKey privateKey;
@@ -29,15 +31,29 @@ public class Authenticator {
         if(exp == null || exp.isEmpty()) exp = "720";
         expiry = Integer.valueOf(exp) * 3600;
 
-        try(
-            FileInputStream sec  = new FileInputStream(Config.getValue("public_key"));
-            FileInputStream pub = new FileInputStream(Config.getValue("private_key"));
-        ) {
-            var sec_bytes = sec.readAllBytes();
-            var pub_bytes = pub.readAllBytes();
-            KeyFactory keefactory = KeyFactory.getInstance("EdDSA");
-            privateKey = keefactory.generatePrivate(new PKCS8EncodedKeySpec(sec_bytes));
-            publicKey = keefactory.generatePublic(new X509EncodedKeySpec(pub_bytes));
+        String privateKeyPath = Config.getValue("private_key");
+        String publicKeyPath = Config.getValue("public_key");
+
+        try {
+            KeyFactory keyFactory = KeyFactory.getInstance("EC");
+            byte[] priv = Files.readAllBytes(Paths.get(privateKeyPath));
+            byte[] pub = Files.readAllBytes(Paths.get(publicKeyPath));
+
+            PKCS8EncodedKeySpec privateKeySpec= new PKCS8EncodedKeySpec(priv);
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(pub);
+
+            publicKey = keyFactory.generatePublic(publicKeySpec);
+            privateKey = keyFactory.generatePrivate(privateKeySpec);
+        } catch (Exception e) {
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
+            keyPairGenerator.initialize(256);
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            privateKey = keyPair.getPrivate();
+            publicKey = keyPair.getPublic();
+
+            Files.write(Paths.get(privateKeyPath), privateKey.getEncoded());
+            Files.write(Paths.get(publicKeyPath), publicKey.getEncoded());
         }
     }
 

@@ -80,6 +80,7 @@ public class Database {
             user.setUserId(result.getInt(2));
             user.setTelegramUserId(result.getLong(3));
             user.setTelegramChatId(result.getLong(4));
+            user.setPassword(null);
 
             return user;
 
@@ -118,6 +119,7 @@ public class Database {
             var result = stmnt.executeQuery();
             result.next();
             user.setUserId(result.getInt(1));
+            user.setPassword(null);
             return user;
         }
         catch(SQLException e) {
@@ -278,7 +280,7 @@ public class Database {
             stmnt.setLong(1, chatId);
             var result = stmnt.executeQuery();
             if(!result.next()) {
-                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "user note found");
+                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "user not found");
             }
             FlashBackUser user = new FlashBackUser();
             user.setTelegramChatId(chatId);

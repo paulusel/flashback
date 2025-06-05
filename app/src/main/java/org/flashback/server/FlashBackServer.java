@@ -15,20 +15,23 @@ public class FlashBackServer {
     private static int nThreads;
     private static int queueSize;
 
-    private static final BlockingQueue<RequestResponsePair> queue = new ArrayBlockingQueue<>(queueSize);
-    private static Server httpServer = new Server(port);
+    private static BlockingQueue<RequestResponsePair> queue;
+    private static Server httpServer;
     private static final ArrayList<Thread> threads = new ArrayList<>();
 
     public static void start() throws Exception{
-        FlashBackServer.port = Integer.valueOf(Config.getValue("server_port"));
 
         String queueSize = Config.getValue("server_queue_size");
         String nThreads = Config.getValue("server_nthreads");
         if(queueSize == null || queueSize.isEmpty()) queueSize = "100";
         if(nThreads == null || nThreads.isEmpty()) nThreads = "2";
 
+        FlashBackServer.port = Integer.valueOf(Config.getValue("server_port"));
         FlashBackServer.queueSize = Integer.valueOf(queueSize);
         FlashBackServer.nThreads = Integer.valueOf(nThreads);
+
+        queue = new ArrayBlockingQueue<RequestResponsePair>(FlashBackServer.queueSize);
+        httpServer = new Server(port);
 
 
         ServletContextHandler context = new ServletContextHandler();

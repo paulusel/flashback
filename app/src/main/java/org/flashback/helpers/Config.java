@@ -54,7 +54,7 @@ public class Config {
                 throw new RuntimeException("expected numberic value for " + key + " in config. found: " + value);
             }
             Integer num = Integer.valueOf(value);
-            if(num < 1 || (key.equals("server_port") && num > 65535) || (!key.equals("server_port") && num > 200)) {
+            if(num < 1 || (key.equals("server_port") && num > 65535) || (!key.equals("server_port") && num > 1000)) {
                 throw new RuntimeException("config value for [" + key + "] in config is out of bound. value: " + value);
             }
         });
