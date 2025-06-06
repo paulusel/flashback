@@ -4,12 +4,19 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Arrays;
 
+import javax.crypto.*;
+import javax.crypto.spec.*;
+import java.nio.*;
+import java.util.*;
+
+
 import org.flashback.helpers.Config;
-import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.exceptions.FlashbackException;
+import org.flashback.exceptions.VerificationException;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Cookie;
 
@@ -22,10 +29,14 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.security.*;
 
+
+
 public class Authenticator {
+
     private static PrivateKey privateKey;
     private static PublicKey publicKey;
     private static int expiry;
+
     public static void init() throws Exception {
         String exp = Config.getValue("jwt_token_expiry");
         if(exp == null || exp.isEmpty()) exp = "720";
@@ -63,6 +74,7 @@ public class Authenticator {
      * @throws FlashbackException if token not found or invalid or expired
      */
     public static Integer authenticate(HttpServletRequest request) throws FlashbackException {
+
         try {
             String cookie = extractCookie(request);
             String token = cookie.isEmpty() ? extractBearer(request) : cookie;
@@ -81,7 +93,7 @@ public class Authenticator {
             return Integer.valueOf(userIdStr);
         }
         catch(JwtException e) {
-            throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "invalid or expired bearer token");
+            throw new VerificationException();
         }
     }
 
@@ -89,37 +101,12 @@ public class Authenticator {
      * @param userId User id to be the subject of the token
      * @return token generated
      */
-
     public static String generateToken(Integer userId) {
         return Jwts.builder()
                 .signWith(privateKey)
                 .subject(String.valueOf(userId))
                 .expiration(Date.from(Instant.now().plusSeconds(expiry)))
                 .compact();
-    }
-
-    public static String generateOtpToken(Integer userId) {
-        return Jwts.builder()
-            .subject(String.valueOf(userId))
-            .expiration(Date.from(Instant.now().plusSeconds(600)))
-            .encryptWith(publicKey, Jwts.KEY.RSA_OAEP, Jwts.ENC.A256GCM)
-            .compact();
-    }
-
-    public static Integer verifyOtpToken(String token) throws FlashbackException {
-        try {
-            String userIdStr = Jwts.parser()
-                    .decryptWith(privateKey)
-                    .build()
-                    .parseEncryptedClaims(token)
-                    .getPayload()
-                    .getSubject();
-
-            return Integer.valueOf(userIdStr);
-        }
-        catch(JwtException e) {
-            throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "invalid or expired otp token");
-        }
     }
 
     private static String extractCookie(HttpServletRequest request) {
@@ -140,5 +127,29 @@ public class Authenticator {
         }
 
         return header.substring(7);
+    }
+
+    public static String generateOtpToken(Integer userId) {
+        return Jwts.builder()
+                .signWith(privateKey)
+                .subject(String.valueOf(userId))
+                .expiration(Date.from(Instant.now().plusSeconds(300)))
+                .compact();
+    }
+
+    public static Integer verifyOtpToken(String token) throws VerificationException {
+        try {
+            String userIdStr = Jwts.parser()
+                    .verifyWith(publicKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload()
+                    .getSubject();
+
+            return Integer.valueOf(userIdStr);
+        }
+        catch(JwtException e) {
+            throw new VerificationException();
+        }
     }
 }

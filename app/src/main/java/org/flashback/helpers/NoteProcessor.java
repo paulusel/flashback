@@ -1,11 +1,14 @@
 package org.flashback.helpers;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 
 import java.security.DigestInputStream;
@@ -22,6 +25,8 @@ import org.apache.commons.fileupload2.core.FileItemInput;
 import org.apache.commons.fileupload2.jakarta.servlet6.JakartaServletDiskFileUpload;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.tika.Tika;
+
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.FlashBackNote;
 import org.flashback.types.NoteFile;
@@ -33,19 +38,19 @@ public class NoteProcessor {
     public static final List<String> VIDEO_EXTENSIONS = Arrays.asList("mp4", "mov", "mkv", "avi", "webm", "flv");
 
     public static final Map<String, String> MIME_TO_EXTENSION = Map.ofEntries(
-        Map.entry("image/jpeg", ".jpg"),
-        Map.entry("image/png", ".png"),
-        Map.entry("image/webp", ".webp"),
-        Map.entry("image/gif", ".gif"),
-        Map.entry("video/mp4", ".mp4"),
-        Map.entry("video/quicktime", ".mov"),
-        Map.entry("video/webm", ".webm"),
-        Map.entry("audio/mpeg", ".mp3"),
-        Map.entry("audio/ogg", ".ogg"),
-        Map.entry("application/pdf", ".pdf"),
-        Map.entry("application/zip", ".zip"),
-        Map.entry("application/x-rar-compressed", ".rar"),
-        Map.entry("text/plain", ".txt")
+        Map.entry("image/jpeg", "jpg"),
+        Map.entry("image/png", "png"),
+        Map.entry("image/webp", "webp"),
+        Map.entry("image/gif", "gif"),
+        Map.entry("video/mp4", "mp4"),
+        Map.entry("video/quicktime", "mov"),
+        Map.entry("video/webm", "webm"),
+        Map.entry("audio/mpeg", "mp3"),
+        Map.entry("audio/ogg", "ogg"),
+        Map.entry("application/pdf", "pdf"),
+        Map.entry("application/zip", "zip"),
+        Map.entry("application/x-rar-compressed", "rar"),
+        Map.entry("text/plain", "txt")
     );
 
     private static Path tempDir;
@@ -99,14 +104,13 @@ public class NoteProcessor {
                         int id = Integer.valueOf(txt);
                         note.setNoteId(id);
                     }
-                    else if(fieldName.startsWith("tag")) {
-                        note.addTag(txt);
+                    else if(fieldName.equals("tag")) {
+                        note.getTags().add(txt);
                     }
                 }
                 else {
-                    FileItemInput fileItem = iterator.next();
-                    try (InputStream stream = fileItem.getInputStream()) {
-                        NoteFile file = processFile(new NoteFile(), stream, fileItem.getName());
+                    try (InputStream stream = item.getInputStream()) {
+                        NoteFile file = processFile(new NoteFile(), stream, item.getName());
                         note.addFile(file);
                     }
                 }
@@ -141,10 +145,10 @@ public class NoteProcessor {
             String hash = HexFormat.of().formatHex(digest.digest());
 
             String extension = FilenameUtils.getExtension(fileName);
-            String contentType = Files.probeContentType(filePath);
-            if(extension == null || extension.isEmpty() || extension.equals(".tmp")) {
+            String contentType = new Tika().detect(filePath);
+            if(extension == null || extension.isEmpty() || extension.equals("tmp")) {
                 extension = MIME_TO_EXTENSION.get(contentType);
-                extension = extension == null ? ".dat" : extension;
+                extension = extension == null ? "dat" : extension;
             }
 
             file.setFileId(hash);
@@ -181,15 +185,18 @@ public class NoteProcessor {
 
     public static void postProcessFiles(Integer userId, FlashBackNote note) throws FlashbackException {
         try {
-            Path user_dir = destDir.resolve(String.valueOf(userId));
-            if(!Files.exists(user_dir)) {
-                Files.createDirectory(user_dir);
+            Path userDir = destDir.resolve(String.valueOf(userId));
+            if(!Files.exists(userDir)) {
+                Files.createDirectory(userDir);
             }
 
             for(NoteFile file: note.getFiles()) {
                 Path src = tempDir.resolve(file.getFileName());
-                Path dest_dir = user_dir.resolve(file.getFileId());
-                Files.createDirectory(dest_dir);
+                Path dest_dir = userDir.resolve(file.getFileId());
+
+                try { Files.createDirectory(dest_dir); }
+                catch(FileAlreadyExistsException e) { continue; }
+
                 Path dest = dest_dir.resolve(file.getFileName());
                 Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
 
@@ -207,7 +214,7 @@ public class NoteProcessor {
     private static void ffmpegProcessVideo(Path video_path) throws FlashbackException {
         try {
             String filename = video_path.toString();
-            String output_path = FilenameUtils.getBaseName(filename);
+            String output_path = FilenameUtils.getFullPathNoEndSeparator(filename);
 
             List<String> command = Arrays.asList(
                 "ffmpeg", "-i", filename,
@@ -231,7 +238,19 @@ public class NoteProcessor {
             );
 
             ProcessBuilder pb = new ProcessBuilder(command);
+
+            // debug
+            pb.redirectErrorStream(true);
+
             Process process = pb.start();
+
+            // Read the output from the process
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);  // Print FFmpeg output to console
+            }
+
             int exitCode = process.waitFor();
             if(exitCode != 0) throw new Exception();
         }

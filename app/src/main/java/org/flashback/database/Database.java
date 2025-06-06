@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.exceptions.FlashbackException;
+import org.flashback.exceptions.UserNotFoundException;
 import org.flashback.helpers.Config;
 import org.flashback.types.FlashBackUser;
 import org.flashback.types.NoteFile;
@@ -15,6 +16,8 @@ import org.mindrot.jbcrypt.BCrypt;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 public class Database {
 
@@ -157,7 +160,7 @@ public class Database {
         noteFileInsertStmnt.setInt(1, noteId);
 
         var fileInsertStmnt = conn.prepareStatement(
-            "INSERT INTO files (file_id, extension, mime_type, size, telegram_file_id) VALUES (?,?,?,?,?)");
+            "INSERT INTO files (file_id, extension, mime_type, size, telegram_file_id) VALUES (?,?,?,?,?) ON CONFlICT DO NOTHING");
         for(var file : files) {
             fileInsertStmnt.setString(1, file.getFileId());
             fileInsertStmnt.setString(2, file.getExtension());
@@ -174,7 +177,7 @@ public class Database {
     }
 
     private static void insertNoteTags(Connection conn, Integer noteId, List<String> tags) throws SQLException {
-        var tagInsertStmnt = conn.prepareStatement("INSERT INTO tags (note_id, tag) VALUES (?,?)");
+        var tagInsertStmnt = conn.prepareStatement("INSERT INTO note_tags (note_id, tag) VALUES (?,?)");
         tagInsertStmnt.setInt(1, noteId);
 
         for(var tag : tags) {
@@ -199,6 +202,8 @@ public class Database {
             note.setNote(result.getString(1));
             note.setModified(result.getTimestamp(2));
             note.setModified(result.getTimestamp(3));
+            note.setNoteId(noteId);
+
             loadNoteFiles(conn, note);
             loadNoteTags(conn, note);
             return note;
@@ -226,7 +231,7 @@ public class Database {
     }
 
     private static void loadNoteTags(Connection conn, FlashBackNote note) throws SQLException {
-        var stmnt = conn.prepareStatement("SELECT tag FROM tags JOIN note_tags USING (file_id) WHERE note_tags.note_id = ?");
+        var stmnt = conn.prepareStatement("SELECT tag FROM notes JOIN note_tags USING (note_id) WHERE note_tags.note_id = ?");
         stmnt.setInt(1, note.getNoteId());
         var result = stmnt.executeQuery();
         while(result.next()) {
@@ -238,8 +243,10 @@ public class Database {
         try(var conn = ds.getConnection()) {
             var stmnt = conn.prepareStatement("DELETE FROM notes WHERE note_id = ? AND owner_id = ?");
             stmnt.setInt(1, noteId);
+            stmnt.setInt(2, userId);
+
             if(stmnt.executeUpdate() == 0) {
-                throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "not authorized to take action");
+                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "note not found");
             }
         }
         catch(SQLException e) {
@@ -280,7 +287,7 @@ public class Database {
             stmnt.setLong(1, chatId);
             var result = stmnt.executeQuery();
             if(!result.next()) {
-                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "user not found");
+                throw new UserNotFoundException();
             }
             FlashBackUser user = new FlashBackUser();
             user.setTelegramChatId(chatId);
@@ -315,7 +322,50 @@ public class Database {
     }
 
     public static void updateUser(Integer userId, FlashBackUser user) throws FlashbackException {
+        try (var conn = ds.getConnection()){
+            List<String> updates = new ArrayList<>();
+            List<Pair<Integer, Object>> values = new ArrayList<>();
 
+            if(user.getPassword() != null) {
+                updates.add("password = ?");
+                String passwordHash = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt(10));
+                values.add(Pair.of(1, passwordHash));
+            }
+
+            if(user.getTelegramChatId() != null) {
+                updates.add("telegram_chat_id = ?");
+                values.add(Pair.of(2, user.getTelegramChatId()));
+            }
+
+            if(user.getTelegramUserId() != null) {
+                updates.add("telegram_user_id = ?");
+                values.add(Pair.of(2, user.getTelegramUserId()));
+            }
+
+            if(updates.isEmpty()) {
+                throw new FlashbackException(HttpStatus.BAD_REQUEST_400, "empty update");
+            }
+
+            String sql = "UPDATE users SET " + String.join(", ", updates) + " WHERE user_id = ?";
+            var stmnt = conn.prepareStatement(sql);
+
+            int i = 1;
+            for(var val : values) {
+                if(val.getLeft() == 0) {
+                    stmnt.setString(i, (String)val.getRight());
+                }
+                else {
+                    stmnt.setLong(i, (Long)val.getRight());
+                }
+                ++i;
+            }
+            stmnt.setInt(i, userId);
+            stmnt.executeUpdate();
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 
     public static void addOrUpdateNote(Integer userId, FlashBackNote note) throws FlashbackException {

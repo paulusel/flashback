@@ -19,10 +19,12 @@ public class AddNoteHandler {
             try {
                 note = NoteProcessor.extractNoteFromForm(exchange.request);
                 Database.addNoteAndAssignId(userId, note);
-                NoteProcessor.postProcessFiles(userId, note);
+                if(!note.getFiles().isEmpty()) {
+                    NoteProcessor.postProcessFiles(userId, note);
+                }
             }
             catch(Exception e) {
-                if(note != null) {
+                if(note != null && !note.getFiles().isEmpty()) {
                     NoteProcessor.cleanFiles(userId, note);
                 }
                 throw e;
@@ -31,7 +33,9 @@ public class AddNoteHandler {
                 FlashBackUser user = Database.getUserByUserId(userId);
                 if(user.getTelegramChatId() != null) {
                     note = FlashBackBot.sendNote(user, note.getNoteId());
-                    Database.updateNote(userId, note);
+                    if(!note.getFiles().isEmpty()) {
+                        Database.updateNote(userId, note);
+                    }
                 }
             }
             catch(Exception e){
@@ -43,6 +47,7 @@ public class AddNoteHandler {
             GenericHandler.handleException(exchange, e);
         }
         catch(Exception e) {
+            e.printStackTrace();
             GenericHandler.handleException(exchange, new FlashbackException());
         }
     }

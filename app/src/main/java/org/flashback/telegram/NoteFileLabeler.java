@@ -23,45 +23,69 @@ public class NoteFileLabeler {
         var documents = new NoteFileCategory(NoteFileCategory.FileCategory.DOCUMENT);
 
         Path userPath = Path.of(Config.getValue("uploads_dir")).resolve(String.valueOf(user.getUserId()));
+
         for(NoteFile file : files) {
             String mime = file.getMimeType();
-            Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
-            String telegramFileId = file.getTelegramFileId();
 
-            if(mime.startsWith("image/")) {
-                var builder = InputMediaPhoto.builder();
-                builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
-                    : builder.media(telegramFileId);
-                visuals.media.add(builder.build());
-                visuals.files.add(file);
-            }
-            if(mime.startsWith("video/")) {
-                var builder = InputMediaVideo.builder();
-                builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
-                    : builder.media(telegramFileId);
-                visuals.media.add(builder.build());
-                visuals.files.add(file);
-            }
-            else if(mime.startsWith("audio/")) {
-                var builder = InputMediaAudio.builder();
-                builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
-                    : builder.media(telegramFileId);
-                audios.media.add(builder.build());
-                audios.files.add(file);
-            }
-            else {
-                var builder = InputMediaDocument.builder();
-                builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
-                    : builder.media(telegramFileId);
-                documents.media.add(builder.build());
-                documents.files.add(file);
+            if(mime.startsWith("image/")) { visuals.files.add(file); }
+            else if(mime.startsWith("video/")) { visuals.files.add(file); }
+            else if(mime.startsWith("audio/")) { audios.files.add(file); }
+            else { documents.files.add(file); }
+        }
 
+        if(!visuals.files.isEmpty()) {
+            categories.add(visuals);
+            if(visuals.files.size() > 1) {
+                for(var file : visuals.files) {
+                    Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
+                    String telegramFileId = file.getTelegramFileId();
+                    String mime = file.getMimeType();
+
+                    if(mime.startsWith("image/")) {
+                        var builder = InputMediaPhoto.builder();
+                        builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
+                            : builder.media(telegramFileId);
+                        visuals.media.add(builder.build());
+                    }
+                    else {
+                        var builder = InputMediaVideo.builder();
+                        builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
+                            : builder.media(telegramFileId);
+                        visuals.media.add(builder.build());
+                    }
+                }
             }
         }
 
-        if(!documents.media.isEmpty()) categories.add(documents);
-        if(!audios.media.isEmpty()) categories.add(audios);
-        if(!visuals.media.isEmpty()) categories.add(visuals);
+        if(!audios.files.isEmpty()) {
+            categories.add(audios);
+            if(audios.files.size() > 1) {
+                for(var file : audios.files) {
+                    Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
+                    String telegramFileId = file.getTelegramFileId();
+
+                    var builder = InputMediaAudio.builder();
+                    builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
+                        : builder.media(telegramFileId);
+                    audios.media.add(builder.build());
+                }
+            }
+        }
+
+        if(!documents.files.isEmpty()) {
+            categories.add(documents);
+            if(documents.files.size() > 1) {
+                for(var file : documents.files) {
+                    Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
+                    String telegramFileId = file.getTelegramFileId();
+
+                    var builder = InputMediaDocument.builder();
+                    builder = (telegramFileId == null) ? builder.media(new File(filePath.toString()), file.getFileName())
+                        : builder.media(telegramFileId);
+                    documents.media.add(builder.build());
+                }
+            }
+        }
 
         return categories;
     }
