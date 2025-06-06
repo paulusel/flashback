@@ -156,11 +156,13 @@ public class Database {
     }
 
     private static void insertNoteFiles(Connection conn, Integer noteId, List<NoteFile> files) throws SQLException {
-        var noteFileInsertStmnt = conn.prepareStatement("INSERT INTO note_files (note_id, file_id) VALUES (?,?)");
+        var noteFileInsertStmnt = conn.prepareStatement(
+            "INSERT INTO note_files (note_id, file_id) VALUES (?,?) ON CONFlICT DO NOTHING");
         noteFileInsertStmnt.setInt(1, noteId);
 
         var fileInsertStmnt = conn.prepareStatement(
-            "INSERT INTO files (file_id, extension, mime_type, size, telegram_file_id) VALUES (?,?,?,?,?) ON CONFlICT DO NOTHING");
+            "INSERT INTO files (file_id, extension, mime_type, size, telegram_file_id) "
+            + " VALUES (?,?,?,?,?) ON CONFlICT (file_id) DO UPDATE SET telegram_file_id = EXCLUDED.telegram_file_id");
         for(var file : files) {
             fileInsertStmnt.setString(1, file.getFileId());
             fileInsertStmnt.setString(2, file.getExtension());
@@ -177,7 +179,8 @@ public class Database {
     }
 
     private static void insertNoteTags(Connection conn, Integer noteId, List<String> tags) throws SQLException {
-        var tagInsertStmnt = conn.prepareStatement("INSERT INTO note_tags (note_id, tag) VALUES (?,?)");
+        var tagInsertStmnt = conn.prepareStatement(
+            "INSERT INTO note_tags (note_id, tag) VALUES (?,?) ON CONFlICT DO NOTHING");
         tagInsertStmnt.setInt(1, noteId);
 
         for(var tag : tags) {

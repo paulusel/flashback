@@ -90,7 +90,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                 if(category.files.size() > 1) {
                     List<String> fileIds = sendMediaGroup(user, category.media);
                     for(int i = 0; i<fileIds.size(); ++i) {
-                        category.files.get(i).setFileId(fileIds.get(i));
+                        category.files.get(i).setTelegramFileId(fileIds.get(i));
                     }
                 }
                 else {
@@ -106,7 +106,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                             fileId = sendDocumentMedia(user, category.files.get(0));
                             break;
                     }
-                    category.files.get(0).setFileId(fileId);
+                    category.files.get(0).setTelegramFileId(fileId);
                 }
             }
         }
