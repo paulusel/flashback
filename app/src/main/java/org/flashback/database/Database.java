@@ -355,8 +355,40 @@ public class Database {
     }
 
     public static List<FlashBackNote> searchNotes(Integer userId, String keyword) throws FlashbackException {
-        List<FlashBackNote> notes = new ArrayList<>();
-        return notes;
+        String sql = "SELECT DISTINCT n.note_id, n.note, n.modified, n.created " +
+                    "FROM flashback.notes n " +
+                    "LEFT JOIN flashback.note_tags nt ON n.note_id = nt.note_id " +
+                    "WHERE n.owner_id = ? AND (n.note_tsvector @@ to_tsquery('english', ?) OR nt.tag ILIKE ?)";
+
+        try (var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)) {
+
+            stmnt.setInt(1, userId);
+            stmnt.setString(2, keyword.trim().replace(" ", " & "));
+            stmnt.setString(3, "%" + keyword + "%");
+
+            List<FlashBackNote> notes = new ArrayList<>();
+            try (var result = stmnt.executeQuery()) {
+                while (result.next()) {
+                    FlashBackNote note = new FlashBackNote();
+                    note.setNoteId(result.getInt(1));
+                    note.setNote(result.getString(2));
+                    note.setModified(result.getTimestamp(3));
+                    note.setCreated(result.getTimestamp(4));
+
+                    loadNoteTags(conn, note);
+                    loadNoteFiles(conn, note);
+
+                    notes.add(note);
+                }
+            }
+
+            return notes;
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 
     public static List<FlashBackNote> getFeed(Integer userId, Long timestamp) throws FlashbackException {

@@ -60,7 +60,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     private TelegramClient client;
     private String token;
     private HashMap<String, CommandHandler> commandHandlers = new HashMap<>();
-    private final ExecutorService downloader = Executors.newSingleThreadExecutor();
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     public BotActionHandler(TelegramClient client, String token) {
         this.client = client;
@@ -359,7 +359,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                 sendNote(user, note);
             }
 
-            downloader.execute(this.new DownloadTask(note.getNoteId(), note.getFiles()));
+            worker.execute(this.new DownloadTask(note.getNoteId(), note.getFiles()));
         }
         catch(UserNotFoundException e) {
             sendPlainMessage(samepleMessage.getChatId(), "You are not registered. Please start this bot with link");
@@ -476,7 +476,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             sendNote(user, existing);
         }
 
-        downloader.execute(this.new DownloadTask(note.getNoteId(), Arrays.asList(file)));
+        worker.execute(this.new DownloadTask(note.getNoteId(), Arrays.asList(file)));
     }
 
 
@@ -543,9 +543,18 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
 
         try {
             FlashBackUser user = Database.getUserByChatId(message.getChatId());
-            for(FlashBackNote note : Database.searchNotes(user.getUserId(), keyword)) {
-                sendNote(user, note);
-            }
+            List<FlashBackNote> notes = Database.searchNotes(user.getUserId(), keyword);
+            worker.execute(() -> {
+                try {
+                    for(FlashBackNote note : notes) {
+                        sendNote(user, note);
+                    }
+                }
+                catch(Exception e) {
+                    System.err.println("Error sending search results");
+                    e.printStackTrace();
+                }
+            });
         }
         catch(UserNotFoundException e) {
             sendPlainMessage(message.getChatId(), "You are not registered. Please start this bot with link");
