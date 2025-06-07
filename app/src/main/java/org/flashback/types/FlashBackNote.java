@@ -9,8 +9,8 @@ public class FlashBackNote {
     private String note;
     private Date modified;
     private Date created;
-    private List<String> tags = new ArrayList<>();
-    private List<NoteFile> files = new ArrayList<>();
+    private final List<String> tags = new ArrayList<>();
+    private final List<NoteFile> files = new ArrayList<>();
 
     public Integer getNoteId() {
         return noteId;
@@ -32,16 +32,8 @@ public class FlashBackNote {
         return tags;
     }
 
-    public void setTags(List<String> tags) {
-        this.tags = tags;
-    }
-
     public List<NoteFile> getFiles() {
         return files;
-    }
-
-    public void setFiles(List<NoteFile> files) {
-        this.files = files;
     }
 
     public Date getModified() {
@@ -59,13 +51,5 @@ public class FlashBackNote {
 
     public void setCreated(Date created) {
         this.created = created;
-    }
-
-    public void addFile(NoteFile file) {
-        this.files.add(file);
-    }
-
-    public void addTag(String tag) {
-        this.tags.add(tag);
     }
 }

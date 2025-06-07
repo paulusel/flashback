@@ -10,6 +10,7 @@ import org.flashback.helpers.*;
 
 public class FileDownloadHandler {
     public static void handle(RequestResponsePair exchange) {
+        /*
         try{
             Integer userId = Authenticator.authenticate(exchange.request);
             String json = GenericHandler.requestBodyString(exchange.request);
@@ -29,5 +30,6 @@ public class FileDownloadHandler {
         catch(FlashbackException e) {
             GenericHandler.handleException(exchange, e);
         }
+        */
     }
 }

@@ -1,10 +1,8 @@
 package org.flashback.helpers;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +17,8 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.commons.fileupload2.core.DiskFileItemFactory;
 import org.apache.commons.fileupload2.core.FileItemInput;
@@ -34,8 +34,7 @@ import org.flashback.types.NoteFile;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class NoteProcessor {
-
-    public static final List<String> VIDEO_EXTENSIONS = Arrays.asList("mp4", "mov", "mkv", "avi", "webm", "flv");
+    private static ExecutorService ffmpegProcessor = Executors.newSingleThreadExecutor();
 
     public static final Map<String, String> MIME_TO_EXTENSION = Map.ofEntries(
         Map.entry("image/jpeg", "jpg"),
@@ -110,8 +109,16 @@ public class NoteProcessor {
                 }
                 else {
                     try (InputStream stream = item.getInputStream()) {
-                        NoteFile file = processFile(new NoteFile(), stream, item.getName());
-                        note.addFile(file);
+                        NoteFile file = new NoteFile();
+                        file = processFile(file, stream, item.getName());
+
+                        String mime = item.getContentType();
+                        if(mime.startsWith("image/")) { file.setFileType(NoteFile.Type.PHOTO); }
+                        else if(mime.startsWith("video/")) { file.setFileType(NoteFile.Type.VIDEO); }
+                        else if(mime.startsWith("audio/")) { file.setFileType(NoteFile.Type.AUDIO); }
+                        else { file.setFileType(NoteFile.Type.DOCUMENT);}
+
+                        note.getFiles().add(file);
                     }
                 }
             }
@@ -151,14 +158,13 @@ public class NoteProcessor {
                 extension = extension == null ? "dat" : extension;
             }
 
-            file.setFileId(hash);
+            file.setHash(hash);
             file.setExtension(extension);
 
             Path destPath = tempDir.resolve(file.getFileName());
             Files.move(filePath, destPath, StandardCopyOption.REPLACE_EXISTING);
 
             file.setSize(Files.size(destPath));
-            file.setMimeType(contentType);
 
             return file;
         }
@@ -168,11 +174,11 @@ public class NoteProcessor {
         }
     }
 
-    public static void cleanFiles(Integer userId, FlashBackNote note) {
-        for(var file : note.getFiles()) {
+    public static void cleanFiles(List<NoteFile> files) {
+        for(var file : files) {
             try {
                 Files.deleteIfExists(tempDir.resolve(file.getFileName()));
-                File file_dir = new File(destDir.resolve(file.getFileId()).toString());
+                File file_dir = new File(destDir.resolve(file.getHash()).toString());
                 if(file_dir.exists()) {
                     FileUtils.deleteDirectory(file_dir);
                 }
@@ -183,35 +189,33 @@ public class NoteProcessor {
         }
     }
 
-    public static void postProcessFiles(Integer userId, FlashBackNote note) throws FlashbackException {
-        try {
-            Path userDir = destDir.resolve(String.valueOf(userId));
-            if(!Files.exists(userDir)) {
-                Files.createDirectory(userDir);
-            }
+    public static void postProcessFiles(List<NoteFile> files) {
+            try {
+                if(!Files.exists(destDir)) {
+                    Files.createDirectory(destDir);
+                }
 
-            for(NoteFile file: note.getFiles()) {
-                Path src = tempDir.resolve(file.getFileName());
-                Path dest_dir = userDir.resolve(file.getFileId());
+                for(NoteFile file: files) {
+                    Path src = tempDir.resolve(file.getFileName());
+                    Path dest_dir = destDir.resolve(file.getHash());
 
-                try { Files.createDirectory(dest_dir); }
-                catch(FileAlreadyExistsException e) { continue; }
+                    try { Files.createDirectory(dest_dir); }
+                    catch(FileAlreadyExistsException e) { continue; }
 
-                Path dest = dest_dir.resolve(file.getFileName());
-                Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
+                    Path dest = dest_dir.resolve(file.getFileName());
+                    Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
 
-                if(VIDEO_EXTENSIONS.contains(file.getExtension())) {
-                    ffmpegProcessVideo(dest);
+                    if(file.getFileType() == NoteFile.Type.VIDEO) {
+                        ffmpegProcessor.execute(() ->  ffmpegProcessVideo(dest));
+                    }
                 }
             }
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-            throw new FlashbackException();
-        }
+            catch(Exception e) {
+                e.printStackTrace();
+            }
     }
 
-    private static void ffmpegProcessVideo(Path video_path) throws FlashbackException {
+    private static void ffmpegProcessVideo(Path video_path) {
         try {
             String filename = video_path.toString();
             String output_path = FilenameUtils.getFullPathNoEndSeparator(filename);
@@ -238,25 +242,13 @@ public class NoteProcessor {
             );
 
             ProcessBuilder pb = new ProcessBuilder(command);
-
-            // debug
-            pb.redirectErrorStream(true);
-
             Process process = pb.start();
-
-            // Read the output from the process
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);  // Print FFmpeg output to console
-            }
-
             int exitCode = process.waitFor();
             if(exitCode != 0) throw new Exception();
         }
         catch(Exception e) {
+            System.err.println("postProcessing with ffmpeg failed");
             e.printStackTrace();
-            throw new FlashbackException();
         }
     }
 }

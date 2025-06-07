@@ -3,7 +3,12 @@ package org.flashback.telegram;
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import org.flashback.database.Database;
+import org.flashback.exceptions.FlashbackException;
 import org.flashback.helpers.Config;
 import org.flashback.types.FlashBackNote;
 import org.flashback.types.FlashBackUser;
@@ -16,6 +21,7 @@ public class FlashBackBot {
     private static TelegramBotsLongPollingApplication botApp;
     private static BotActionHandler botActionHandler;
     private static String token;
+    private static ExecutorService noteSender = Executors.newSingleThreadExecutor();
 
     public static void start() throws Exception {
         FlashBackBot.token = Config.getValue("bot_token");
@@ -35,12 +41,29 @@ public class FlashBackBot {
         botApp.close();
     }
 
-    public static FlashBackNote sendNote(FlashBackUser user, Integer noteId) throws Exception {
-        FlashBackNote note = Database.getNote(user.getUserId(), noteId);
-        return botActionHandler.sendNote(user, note);
+    public static void trySendNoteToTelegram(Integer userId, FlashBackNote note) {
+        try{
+            FlashBackUser user = Database.getUserByUserId(userId);
+            if(user.getTelegramChatId() != null) {
+                noteSender.execute(() -> {
+                    try {
+                        FlashBackNote not = botActionHandler.sendNote(user, note);
+                        Database.saveTelegramFileIds(not.getFiles());
+                    }
+                    catch(Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+        }
+        catch(FlashbackException e){ 
+            e.printStackTrace();
+            return;
+        }
     }
 
     public static String getBotUserName() throws Exception {
         return botActionHandler.getBotUserName();
     }
+
 }

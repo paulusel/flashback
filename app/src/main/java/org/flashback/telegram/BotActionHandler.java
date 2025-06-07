@@ -7,11 +7,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.flashback.types.FlashBackNote;
 import org.flashback.auth.Authenticator;
 import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
+import org.flashback.exceptions.NoteNotFound;
 import org.flashback.exceptions.UserNotFoundException;
 import org.flashback.exceptions.VerificationException;
 import org.flashback.helpers.Config;
@@ -40,7 +43,10 @@ import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.Video;
-import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaAudio;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaVideo;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -54,6 +60,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     private TelegramClient client;
     private String token;
     private HashMap<String, CommandHandler> commandHandlers = new HashMap<>();
+    private final ExecutorService downloader = Executors.newSingleThreadExecutor();
 
     public BotActionHandler(TelegramClient client, String token) {
         this.client = client;
@@ -75,38 +82,32 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     /*
      *  For new note, files of the note are modified to have fileIds from telegram 
      */
-    public FlashBackNote sendNote(FlashBackUser user, Integer noteId) throws TelegramApiException, FlashbackException {
-        FlashBackNote note = Database.getNote(user.getUserId(), noteId);
-        return sendNote(user, note);
-    }
-
     public FlashBackNote sendNote(FlashBackUser user, FlashBackNote note) throws  TelegramApiException, FlashbackException {
         Long chatId = user.getTelegramUserId();
         if(chatId == null) throw new TelegramApiException();
 
-        if(note.getFiles() != null) {
+        if(!note.getFiles().isEmpty()) {
             List<NoteFileCategory> categories = NoteFileLabeler.categorize(user, note.getFiles());
             for(NoteFileCategory category: categories) {
                 if(category.files.size() > 1) {
-                    List<String> fileIds = sendMediaGroup(user, category.media);
+                    List<String> fileIds = sendMediaGroup(user, category);
                     for(int i = 0; i<fileIds.size(); ++i) {
                         category.files.get(i).setTelegramFileId(fileIds.get(i));
                     }
                 }
                 else {
-                    String fileId;
+                    NoteFile file = category.files.get(0);
                     switch (category.category) {
-                        case NoteFileCategory.FileCategory.VISUAL:
-                            fileId = sendVisualMedia(user, category.files.get(0));
+                        case NoteFileCategory.Category.VISUAL:
+                            file.setTelegramFileId(sendVisualMedia(user, file));
                             break;
-                        case NoteFileCategory.FileCategory.AUDIO:
-                            fileId = sendAudioMedia(user, category.files.get(0));
+                        case NoteFileCategory.Category.AUDIO:
+                            file.setTelegramFileId(sendAudioMedia(user, file));
                             break;
                         default:
-                            fileId = sendDocumentMedia(user, category.files.get(0));
+                            file.setTelegramFileId(sendDocumentMedia(user, file));
                             break;
                     }
-                    category.files.get(0).setTelegramFileId(fileId);
                 }
             }
         }
@@ -115,15 +116,24 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         return note;
     }
 
+    private InputFile getInputFile(NoteFile file) throws TelegramApiException {
+        InputFile inputFile = null;
+        if(file.getTelegramFileId() != null) {
+            inputFile = new InputFile(file.getTelegramFileId());
+        }
+        else if(file.getHash() != null) {
+            Path filePath = Path.of(Config.getValue("uploads_dir")).resolve(file.getHash()).resolve(file.getFileName());
+            inputFile =  new InputFile(new java.io.File(filePath.toString()), file.getFileName());
+        }
+        else {
+            throw new TelegramApiException("no file_id or name for media");
+        }
+        return inputFile;
+    }
+
     private String sendVisualMedia(FlashBackUser user, NoteFile file) throws TelegramApiException {
-        Path userPath = Path.of(Config.getValue("uploads_dir")).resolve(String.valueOf(user.getUserId()));
-        Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
-
-        InputFile inputFile = file.getTelegramFileId() == null
-            ? new InputFile(new java.io.File(filePath.toString()), file.getFileName())
-            : new InputFile(file.getTelegramFileId());
-
-        if(file.getMimeType().startsWith("image/")) {
+        InputFile inputFile = getInputFile(file);
+        if(file.getFileType() == NoteFile.Type.PHOTO) {
             SendPhoto sendPhoto = SendPhoto
                 .builder()
                 .chatId(user.getTelegramChatId())
@@ -142,12 +152,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     }
 
     private String sendAudioMedia(FlashBackUser user, NoteFile file) throws TelegramApiException {
-        Path userPath = Path.of(Config.getValue("uploads_dir")).resolve(String.valueOf(user.getUserId()));
-        Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
-
-        InputFile inputFile = file.getTelegramFileId() == null 
-            ? new InputFile(new java.io.File(filePath.toString()), file.getFileName())
-            : new InputFile(file.getTelegramFileId());
+        InputFile inputFile = getInputFile(file);
 
         SendAudio sendAudio = SendAudio
             .builder()
@@ -158,12 +163,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     }
 
     private String sendDocumentMedia(FlashBackUser user, NoteFile file) throws TelegramApiException {
-        Path userPath = Path.of(Config.getValue("uploads_dir")).resolve(String.valueOf(user.getUserId()));
-        Path filePath = userPath.resolve(file.getFileId()).resolve(file.getFileName());
-
-        InputFile inputFile = file.getTelegramFileId() == null 
-            ? new InputFile(new java.io.File(filePath.toString()), file.getFileName())
-            : new InputFile(file.getTelegramFileId());
+        InputFile inputFile = getInputFile(file);
 
         SendDocument sendDocument = SendDocument
             .builder()
@@ -173,15 +173,59 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         return client.execute(sendDocument).getDocument().getFileId();
     }
 
-    private List<String> sendMediaGroup(FlashBackUser user, List<InputMedia> media) throws TelegramApiException {
-        if(media == null) return null;
+    private List<String> sendMediaGroup(FlashBackUser user, NoteFileCategory category) throws TelegramApiException {
+        Path uploadDir = Path.of(Config.getValue("uploads_dir"));
         var builder = SendMediaGroup
             .builder()
             .disableNotification(true)
             .chatId(user.getTelegramChatId());
 
-        for(InputMedia medium: media) {
-            builder.media(medium);
+        if(category.category == NoteFileCategory.Category.VISUAL) {
+            for(var file: category.files) {
+                String telegramFileId = file.getTelegramFileId();
+                Path filePath = file.getHash() != null 
+                    ? uploadDir.resolve(file.getHash()).resolve(file.getFileName())
+                    : null;
+
+                if(file.getFileType() == NoteFile.Type.PHOTO) {
+                    InputMediaPhoto media = telegramFileId == null
+                        ? new InputMediaPhoto(new java.io.File(filePath.toString()), file.getFileName())
+                        : new InputMediaPhoto(telegramFileId);
+                    builder = builder.media(media);
+                }
+                else {
+                    InputMediaVideo media = telegramFileId == null
+                        ? new InputMediaVideo(new java.io.File(filePath.toString()), file.getFileName())
+                        : new InputMediaVideo(telegramFileId);
+                    builder = builder.media(media);
+                }
+            }
+        }
+        else if(category.category == NoteFileCategory.Category.AUDIO) {
+            for(var file: category.files) {
+                String telegramFileId = file.getTelegramFileId();
+                Path filePath = file.getHash() != null 
+                    ? uploadDir.resolve(file.getHash()).resolve(file.getFileName())
+                    : null;
+
+                InputMediaAudio media = telegramFileId == null
+                    ? new InputMediaAudio(new java.io.File(filePath.toString()), file.getFileName())
+                    : new InputMediaAudio(telegramFileId);
+                builder = builder.media(media);
+            }
+        }
+        else {
+            for(var file: category.files) {
+                String telegramFileId = file.getTelegramFileId();
+                Path filePath = file.getHash() != null 
+                    ? uploadDir.resolve(file.getHash()).resolve(file.getFileName())
+                    : null;
+
+                InputMediaDocument media = telegramFileId == null
+                    ? new InputMediaDocument(new java.io.File(filePath.toString()), file.getFileName())
+                    : new InputMediaDocument(telegramFileId);
+                builder = builder.media(media);
+            }
         }
 
         List<Message> messages = client.execute(builder.build());
@@ -288,34 +332,34 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             FlashBackUser user = Database.getUserByChatId(samepleMessage.getChatId());
 
             FlashBackNote note = new FlashBackNote();
-            note.setNoteId(getOriginalNoteId(samepleMessage));
 
             String noteTxt = "";
-            List<NoteFile> files = note.getFiles();
 
             for(Message message : group) {
                 String caption = message.getCaption();
                 if(caption != null && !caption.isEmpty()) {
                     noteTxt += "\n\n" + caption;
                 }
-
-                NoteFile file = getFileFromMessage(message);
-                downloadFile(file);
-                files.add(file);
+                note.getFiles().add(getFileFromMessage(message));
             }
 
             note.setNote(noteTxt);
+            note.setNoteId(getOriginalNoteId(samepleMessage));
 
-            try {
-                NoteProcessor.postProcessFiles(user.getUserId(), note);
-                Database.addOrUpdateNote(user.getUserId(), note);
+            if(note.getNoteId() != null) {
+                // existing note
+                Database.updateNote(user.getUserId(), note);
+                FlashBackNote existing = Database.getNote(user.getUserId(), note.getNoteId());
+                existing.getFiles().addAll(note.getFiles());
+                sendNote(user, existing);
             }
-            catch(Exception e) {
-                NoteProcessor.cleanFiles(user.getUserId(), note);
-                throw e;
+            else {
+                // new note
+                Database.addNoteAndAssignId(user.getUserId(), note);
+                sendNote(user, note);
             }
 
-            sendNote(user, note.getNoteId());
+            downloader.execute(this.new DownloadTask(note.getNoteId(), note.getFiles()));
         }
         catch(UserNotFoundException e) {
             sendPlainMessage(samepleMessage.getChatId(), "You are not registered. Please start this bot with link");
@@ -330,50 +374,35 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         NoteFile file = new NoteFile();
         if(message.hasPhoto()) {
             PhotoSize photo = message.getPhoto().getFirst();
+            System.out.println("Processed photo: " + photo.getFileId());
             file.setTelegramFileId(photo.getFileId());
             file.setSize(photo.getFileSize().longValue());
+            file.setFileType(NoteFile.Type.PHOTO);
         }
         else if(message.hasAudio()) {
             Audio audio = message.getAudio();
             file.setTelegramFileId(audio.getFileId());
             file.setExtension(FilenameUtils.getExtension(audio.getFileName()));
             file.setSize(audio.getFileSize());
+            file.setFileType(NoteFile.Type.AUDIO);
         }
         else if(message.hasVideo()) {
             Video video = message.getVideo();
             file.setTelegramFileId(video.getFileId());
             file.setExtension(FilenameUtils.getExtension(video.getFileName()));
             file.setSize(video.getFileSize());
+            file.setFileType(NoteFile.Type.VIDEO);
         }
         else if(message.hasDocument()) {
             Document doc = message.getDocument();
             file.setTelegramFileId(doc.getFileId());
             file.setExtension(FilenameUtils.getExtension(doc.getFileName()));
             file.setSize(doc.getFileSize());
+            file.setFileType(NoteFile.Type.DOCUMENT);
         }
         return file;
     }
 
-    /*
-     * Parameter is modified internally.
-     */
-    private void downloadFile(NoteFile note) throws TelegramApiException {
-        GetFile getFile = GetFile
-            .builder()
-            .fileId(note.getTelegramFileId())
-            .build();
-
-        File file = client.execute(getFile);
-        String fileUrl = file.getFileUrl(this.token);
-        String fileName = note.getTelegramFileId() + (note.getExtension() == null ? ".tmp" : note.getExtension());
-
-        try(InputStream stream = new URI(fileUrl).toURL().openStream()) {
-            NoteProcessor.processFile(note, stream, fileName);
-        }
-        catch(Exception e) {
-            throw new TelegramApiException(e);
-        }
-    }
 
     private void handleLoneMessage(Message message) {
         try {
@@ -419,32 +448,37 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         else { note.setNote(text); }
 
         Database.addOrUpdateNote(user.getUserId(), note);
-        sendNote(user, note.getNoteId());
+        note = Database.getNote(user.getUserId(), note.getNoteId());
+        sendNote(user, note);
     }
 
     public void handleLoneMediaMessage(Message message) throws TelegramApiException, FlashbackException {
         sendProcessingStatus(message.getChatId());
         FlashBackUser user = Database.getUserByChatId(message.getChatId());
         FlashBackNote note = new FlashBackNote();
-        note.setNoteId(getOriginalNoteId(message));
 
-        note.setNote(message.getCaption());
         NoteFile file = getFileFromMessage(message);
-        downloadFile(file);
         note.getFiles().add(file);
 
-        try {
-            NoteProcessor.postProcessFiles(user.getUserId(), note);
-            Database.addOrUpdateNote(user.getUserId(), note);
+        note.setNote(message.getCaption());
+        note.setNoteId(getOriginalNoteId(message));
+
+        if(note.getNoteId() == null) {
+            // new
+            Database.addNoteAndAssignId(user.getUserId(), note);
+            sendNote(user, note);
         }
-        catch(Exception e) {
-            NoteProcessor.cleanFiles(user.getUserId(), note);
-            throw new TelegramApiException();
+        else {
+            // existing
+            Database.updateNote(user.getUserId(), note);
+            FlashBackNote existing = Database.getNote(user.getUserId(), note.getNoteId());
+            existing.getFiles().addAll(note.getFiles());
+            sendNote(user, existing);
         }
 
-        // Echo back the note
-        sendNote(user, note.getNoteId());
+        downloader.execute(this.new DownloadTask(note.getNoteId(), Arrays.asList(file)));
     }
+
 
     public void handleCallbackQuery(CallbackQuery query) {
         try {
@@ -465,7 +499,9 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             client.execute(deleteMessage);
 
             Integer noteId = Integer.valueOf(query.getData());
-            Database.deleteNote(user.getUserId(), noteId);
+
+            try { Database.deleteNote(user.getUserId(), noteId); }
+            catch(NoteNotFound e) {}
         }
         catch(Exception e) {
             e.printStackTrace();
@@ -522,5 +558,44 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     @FunctionalInterface
     private interface CommandHandler {
         public void handle(String argument, Message message)  throws TelegramApiException;
+    }
+
+    private class DownloadTask implements Runnable {
+        private final Integer noteId;
+        private final List<NoteFile> files;
+
+        public DownloadTask(Integer noteId, List<NoteFile> files) {
+            this.noteId = noteId;
+            this.files = files;
+        }
+
+        @Override
+        public void run() {
+            try {
+                for(var file : files) {
+                    GetFile getFile = GetFile
+                        .builder()
+                        .fileId(file.getTelegramFileId())
+                        .build();
+
+                    File telegramFile = BotActionHandler.this.client.execute(getFile);
+                    String fileUrl = telegramFile.getFileUrl(BotActionHandler.this.token);
+                    String fileName = file.getTelegramFileId() + (file.getExtension() == null ? ".tmp" : file.getExtension());
+
+                    try(InputStream stream = new URI(fileUrl).toURL().openStream()) {
+                        NoteProcessor.processFile(file, stream, fileName);
+                    }
+                }
+
+                NoteProcessor.postProcessFiles(files);
+                Database.saveFiles(files);
+                Database.addNoteFiles(noteId, files);
+            }
+            catch(Exception e) {
+                e.printStackTrace();
+                NoteProcessor.cleanFiles(files);
+            }
+        }
+
     }
 }

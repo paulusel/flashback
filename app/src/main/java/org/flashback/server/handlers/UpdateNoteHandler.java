@@ -6,7 +6,6 @@ import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.MessageResponse;
 import org.flashback.types.FlashBackNote;
-import org.flashback.types.FlashBackUser;
 import org.flashback.types.RequestResponsePair;
 import org.flashback.helpers.GenericHandler;
 import org.flashback.helpers.NoteProcessor;
@@ -23,31 +22,23 @@ public class UpdateNoteHandler {
                 if(note.getNoteId() == null) {
                     throw new FlashbackException("noteId is note specfied in the form");
                 }
-
                 Database.updateNote(userId, note);
+
                 if(!note.getFiles().isEmpty()) {
-                    NoteProcessor.postProcessFiles(userId, note);
+                    NoteProcessor.postProcessFiles(note.getFiles()); // async
+                    Database.saveFiles(note.getFiles());
+                    Database.addNoteFiles(note.getNoteId(), note.getFiles());
                 }
             }
             catch(FlashbackException e) {
                 if(note != null) {
-                    NoteProcessor.cleanFiles(userId, note);
+                    NoteProcessor.cleanFiles(note.getFiles());
                 }
                 throw e;
             }
 
-            try {
-                FlashBackUser user = Database.getUserByUserId(userId);
-                if(user.getTelegramChatId() != null) {
-                    note = FlashBackBot.sendNote(user, note.getNoteId());
-                    if(!note.getFiles().isEmpty()) {
-                        Database.updateNote(userId, note);
-                    }
-                }
-            }
-            catch(Exception e) {
-                e.printStackTrace();
-            }
+            note = Database.getNote(userId, note.getNoteId());
+            FlashBackBot.trySendNoteToTelegram(userId, note);
             GenericHandler.sendResponse(new MessageResponse(true, HttpStatus.OK_200, "updated"), exchange);
         }
         catch(FlashbackException e) {

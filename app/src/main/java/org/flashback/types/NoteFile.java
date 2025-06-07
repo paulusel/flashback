@@ -1,27 +1,43 @@
 package org.flashback.types;
 
 public class NoteFile {
+    public enum Type { 
+        PHOTO(1),
+        VIDEO(2),
+        AUDIO(3),
+        DOCUMENT(4);
 
-    private String fileId;
+        private final int value;
+
+        Type(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return this.value;
+        }
+
+        public static Type typeOf(int value) {
+            if(value == 1) return PHOTO;
+            else if(value == 2) return VIDEO;
+            else if(value == 3) return AUDIO;
+            else return DOCUMENT;
+        }
+    }
+
+
+    private String hash;
+    private Type type;
     private String extension;
-    private String mime_type;
     private Long size;
     transient private String telegramFileId;
 
-    public String getFileId() {
-        return fileId;
+    public String getHash() {
+        return this.hash;
     }
 
-    public void setFileId(String fileId) {
-        this.fileId = fileId;
-    }
-
-    public String getMimeType() {
-        return mime_type;
-    }
-
-    public void setMimeType(String mime_type) {
-        this.mime_type = mime_type;
+    public void setHash(String hash) {
+        this.hash = hash;
     }
 
     public Long getSize() {
@@ -49,6 +65,14 @@ public class NoteFile {
     }
 
     public String getFileName() {
-        return this.getFileId() + "." + this.getExtension();
+        return this.getHash() + "." + this.getExtension();
+    }
+
+    public Type getFileType() {
+        return this.type;
+    }
+
+    public void setFileType(Type type) {
+        this.type = type;
     }
 }

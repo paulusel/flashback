@@ -5,7 +5,6 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.auth.Authenticator;
 import org.flashback.types.NoteResponse;
 import org.flashback.types.FlashBackNote;
-import org.flashback.types.FlashBackUser;
 import org.flashback.database.Database;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.helpers.*;
@@ -19,31 +18,25 @@ public class AddNoteHandler {
             try {
                 note = NoteProcessor.extractNoteFromForm(exchange.request);
                 Database.addNoteAndAssignId(userId, note);
+
                 if(!note.getFiles().isEmpty()) {
-                    NoteProcessor.postProcessFiles(userId, note);
+                    NoteProcessor.postProcessFiles(note.getFiles());
+                    Database.saveFiles(note.getFiles());
+                    Database.addNoteFiles(note.getNoteId(), note.getFiles());
                 }
             }
             catch(Exception e) {
                 if(note != null && !note.getFiles().isEmpty()) {
-                    NoteProcessor.cleanFiles(userId, note);
+                    NoteProcessor.cleanFiles(note.getFiles());
                 }
                 throw e;
             }
-            try{
-                FlashBackUser user = Database.getUserByUserId(userId);
-                if(user.getTelegramChatId() != null) {
-                    note = FlashBackBot.sendNote(user, note.getNoteId());
-                    if(!note.getFiles().isEmpty()) {
-                        Database.updateNote(userId, note);
-                    }
-                }
-            }
-            catch(Exception e){
-                e.printStackTrace();
-            }
+
+            FlashBackBot.trySendNoteToTelegram(userId, note);
             GenericHandler.sendResponse(new NoteResponse(true, HttpStatus.CREATED_201, note), exchange);
         }
         catch(FlashbackException e) {
+            e.printStackTrace();
             GenericHandler.handleException(exchange, e);
         }
         catch(Exception e) {

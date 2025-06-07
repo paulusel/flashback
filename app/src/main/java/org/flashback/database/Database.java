@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.flashback.exceptions.FlashbackException;
+import org.flashback.exceptions.NoteNotFound;
 import org.flashback.exceptions.UserNotFoundException;
 import org.flashback.helpers.Config;
 import org.flashback.types.FlashBackUser;
@@ -141,10 +142,6 @@ public class Database {
             result.next();
             note.setNoteId(result.getInt(1));
 
-            if(note.getFiles() != null) {
-                insertNoteFiles(conn, note.getNoteId(), note.getFiles());
-            }
-
             if(note.getTags() != null){
                 insertNoteTags(conn, note.getNoteId(), note.getTags());
             }
@@ -153,29 +150,6 @@ public class Database {
             e.printStackTrace();
             throw new FlashbackException();
         }
-    }
-
-    private static void insertNoteFiles(Connection conn, Integer noteId, List<NoteFile> files) throws SQLException {
-        var noteFileInsertStmnt = conn.prepareStatement(
-            "INSERT INTO note_files (note_id, file_id) VALUES (?,?) ON CONFlICT DO NOTHING");
-        noteFileInsertStmnt.setInt(1, noteId);
-
-        var fileInsertStmnt = conn.prepareStatement(
-            "INSERT INTO files (file_id, extension, mime_type, size, telegram_file_id) "
-            + " VALUES (?,?,?,?,?) ON CONFlICT (file_id) DO UPDATE SET telegram_file_id = EXCLUDED.telegram_file_id");
-        for(var file : files) {
-            fileInsertStmnt.setString(1, file.getFileId());
-            fileInsertStmnt.setString(2, file.getExtension());
-            fileInsertStmnt.setString(3, file.getMimeType());
-            fileInsertStmnt.setLong(4, file.getSize());
-            fileInsertStmnt.setString(5, file.getTelegramFileId());
-            fileInsertStmnt.addBatch();
-
-            noteFileInsertStmnt.setString(2, file.getFileId());
-            noteFileInsertStmnt.addBatch();
-        }
-        fileInsertStmnt.executeBatch();
-        noteFileInsertStmnt.executeBatch();
     }
 
     private static void insertNoteTags(Connection conn, Integer noteId, List<String> tags) throws SQLException {
@@ -218,15 +192,15 @@ public class Database {
     }
 
     private static void loadNoteFiles(Connection conn, FlashBackNote note) throws SQLException {
-        var stmnt = conn.prepareStatement("SELECT file_id, extension, mime_type, size, telegram_file_id " + 
-            " FROM files JOIN note_files USING (file_id) WHERE note_files.note_id = ?");
+        var stmnt = conn.prepareStatement("SELECT files.file_hash, type, extension, size, telegram_file_id " + 
+            " FROM files JOIN note_files USING (file_hash) WHERE note_files.note_id = ?");
         stmnt.setInt(1, note.getNoteId());
         var result = stmnt.executeQuery();
         while(result.next()) {
             NoteFile file = new NoteFile();
-            file.setFileId(result.getString(1));
-            file.setExtension(result.getString(2));
-            file.setMimeType(result.getString(3));
+            file.setHash(result.getString(1));
+            file.setFileType(NoteFile.Type.typeOf(result.getInt(2)));
+            file.setExtension(result.getString(3));
             file.setSize(result.getLong(4));
             file.setTelegramFileId(result.getString(5));
             note.getFiles().addLast(file);
@@ -249,7 +223,7 @@ public class Database {
             stmnt.setInt(2, userId);
 
             if(stmnt.executeUpdate() == 0) {
-                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "note not found");
+                throw new NoteNotFound();
             }
         }
         catch(SQLException e) {
@@ -258,10 +232,11 @@ public class Database {
         }
     }
 
+    /*
     public static NoteFile getFile(Integer userId, String fileId) throws FlashbackException {
         try(var conn = ds.getConnection()) {
             var stmnt = conn.prepareStatement("SELECT telegram_file_id, original_name, size, mime_type " +
-                " FROM file_owners JOIN files USING (file_id) WHERE username = ? AND file_id = ?");
+                " FROM file_owners JOIN files USING (file_id) WHERE user_id = ? AND file_id = ?");
             stmnt.setLong(1, userId);
             stmnt.setString(2, fileId);
             var result = stmnt.executeQuery();
@@ -271,10 +246,9 @@ public class Database {
             }
 
             NoteFile file = new NoteFile();
-            file.setFileId(fileId);
+            file.setHash(fileId);
             file.setTelegramFileId(result.getString(1));
             file.setSize(result.getLong(3));
-            file.setMimeType(result.getString(4));
             return file;
         }
         catch(SQLException e) {
@@ -282,6 +256,7 @@ public class Database {
             throw new FlashbackException();
         }
     }
+    */
 
     public static FlashBackUser getUserByChatId(Long chatId) throws FlashbackException {
         try(var conn = ds.getConnection()) {
@@ -315,7 +290,6 @@ public class Database {
                 stmnt.setInt(2, note.getNoteId());
                 stmnt.executeUpdate();
             }
-            insertNoteFiles(conn, note.getNoteId(), note.getFiles());
             insertNoteTags(conn, note.getNoteId(), note.getTags());
         }
         catch(SQLException e) {
@@ -388,5 +362,89 @@ public class Database {
     public static List<FlashBackNote> getFeed(Integer userId, Long timestamp) throws FlashbackException {
         List<FlashBackNote> notes = new ArrayList<>();
         return notes;
+    }
+
+    public static List<NoteFile> getNoteFiles(Integer noteId) throws FlashbackException {
+        String sql = "SELECT files.file_hash, type, extension, size, telegram_file_id FROM files JOIN note_files "
+            + " USING (file_hash) WHERE note_files.note_id = ?";
+        try(var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)) {
+            stmnt.setInt(1, noteId);
+            var result = stmnt.executeQuery();
+
+            List<NoteFile> files = new ArrayList<>();
+            while(result.next()) {
+                NoteFile file = new NoteFile();
+                file.setHash(result.getString(1));
+                file.setFileType(NoteFile.Type.typeOf(result.getInt(2)));
+                file.setExtension(result.getString(3));
+                file.setSize(result.getLong(4));
+                file.setTelegramFileId(result.getString(5));
+                files.add(file);
+            }
+
+            return files;
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
+    }
+
+    public static void saveFiles(List<NoteFile> files) throws FlashbackException {
+        String sql = "INSERT INTO files (file_hash, type, extension, size, telegram_file_id) "
+            + " VALUES (?, ?, ?, ?, ?) ON CONFlICT DO NOTHING";
+        try(var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)) {
+            for(var file : files) {
+                stmnt.setString(1, file.getHash());
+                stmnt.setInt(2, file.getFileType().getValue());
+                stmnt.setString(3, file.getExtension());
+                stmnt.setLong(4, file.getSize());
+                stmnt.setString(5, file.getTelegramFileId());
+                stmnt.addBatch();
+            }
+            stmnt.executeBatch();
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
+    }
+
+    public static void addNoteFiles(Integer noteId, List<NoteFile> files) throws FlashbackException {
+        String sql ="INSERT INTO note_files (note_id, file_hash) VALUES (?, ?) ON CONFlICT DO NOTHING";
+        try (var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)) {
+            stmnt.setInt(1, noteId);
+            for(var file : files) {
+                stmnt.setString(2, file.getHash());
+                stmnt.addBatch();
+            }
+            stmnt.executeBatch();
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
+    }
+
+    public static void saveTelegramFileIds(List<NoteFile> files) throws FlashbackException {
+        String sql ="UPDATE files SET telegram_file_id = ? WHERE file_hash = ?";
+        try (var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)) {
+
+            for(var file : files) {
+                stmnt.setString(1, file.getTelegramFileId());
+                stmnt.setString(2, file.getHash());
+                stmnt.addBatch();
+            }
+            stmnt.executeBatch();
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
+
     }
 }
