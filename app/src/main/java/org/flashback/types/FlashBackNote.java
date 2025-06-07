@@ -10,7 +10,7 @@ public class FlashBackNote {
     private Date modified;
     private Date created;
     private final List<String> tags = new ArrayList<>();
-    private final List<NoteFile> files = new ArrayList<>();
+    private final List<FlashBackFile> files = new ArrayList<>();
 
     public Integer getNoteId() {
         return noteId;
@@ -32,7 +32,7 @@ public class FlashBackNote {
         return tags;
     }
 
-    public List<NoteFile> getFiles() {
+    public List<FlashBackFile> getFiles() {
         return files;
     }
 

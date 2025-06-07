@@ -29,7 +29,7 @@ import org.apache.tika.Tika;
 
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.FlashBackNote;
-import org.flashback.types.NoteFile;
+import org.flashback.types.FlashBackFile;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -109,14 +109,14 @@ public class NoteProcessor {
                 }
                 else {
                     try (InputStream stream = item.getInputStream()) {
-                        NoteFile file = new NoteFile();
+                        FlashBackFile file = new FlashBackFile();
                         file = processFile(file, stream, item.getName());
 
                         String mime = item.getContentType();
-                        if(mime.startsWith("image/")) { file.setFileType(NoteFile.Type.PHOTO); }
-                        else if(mime.startsWith("video/")) { file.setFileType(NoteFile.Type.VIDEO); }
-                        else if(mime.startsWith("audio/")) { file.setFileType(NoteFile.Type.AUDIO); }
-                        else { file.setFileType(NoteFile.Type.DOCUMENT);}
+                        if(mime.startsWith("image/")) { file.setFileType(FlashBackFile.Type.PHOTO); }
+                        else if(mime.startsWith("video/")) { file.setFileType(FlashBackFile.Type.VIDEO); }
+                        else if(mime.startsWith("audio/")) { file.setFileType(FlashBackFile.Type.AUDIO); }
+                        else { file.setFileType(FlashBackFile.Type.DOCUMENT);}
 
                         note.getFiles().add(file);
                     }
@@ -142,7 +142,7 @@ public class NoteProcessor {
         }
     }
 
-    public static NoteFile processFile(NoteFile file, InputStream stream, String fileName) throws FlashbackException {
+    public static FlashBackFile processFile(FlashBackFile file, InputStream stream, String fileName) throws FlashbackException {
         try{
             Path filePath = tempDir.resolve(fileName);
 
@@ -174,7 +174,7 @@ public class NoteProcessor {
         }
     }
 
-    public static void cleanFiles(List<NoteFile> files) {
+    public static void cleanFiles(List<FlashBackFile> files) {
         for(var file : files) {
             try {
                 Files.deleteIfExists(tempDir.resolve(file.getFileName()));
@@ -189,13 +189,13 @@ public class NoteProcessor {
         }
     }
 
-    public static void postProcessFiles(List<NoteFile> files) {
+    public static void postProcessFiles(List<FlashBackFile> files) {
             try {
                 if(!Files.exists(destDir)) {
                     Files.createDirectory(destDir);
                 }
 
-                for(NoteFile file: files) {
+                for(FlashBackFile file: files) {
                     Path src = tempDir.resolve(file.getFileName());
                     Path dest_dir = destDir.resolve(file.getHash());
 
@@ -205,7 +205,7 @@ public class NoteProcessor {
                     Path dest = dest_dir.resolve(file.getFileName());
                     Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
 
-                    if(file.getFileType() == NoteFile.Type.VIDEO) {
+                    if(file.getFileType() == FlashBackFile.Type.VIDEO) {
                         ffmpegProcessor.execute(() ->  ffmpegProcessVideo(dest));
                     }
                 }

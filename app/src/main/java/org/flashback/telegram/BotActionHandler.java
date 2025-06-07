@@ -20,7 +20,7 @@ import org.flashback.exceptions.VerificationException;
 import org.flashback.helpers.Config;
 import org.flashback.helpers.NoteProcessor;
 import org.flashback.types.FlashBackUser;
-import org.flashback.types.NoteFile;
+import org.flashback.types.FlashBackFile;
 
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -96,7 +96,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                     }
                 }
                 else {
-                    NoteFile file = category.files.get(0);
+                    FlashBackFile file = category.files.get(0);
                     switch (category.category) {
                         case NoteFileCategory.Category.VISUAL:
                             file.setTelegramFileId(sendVisualMedia(user, file));
@@ -116,7 +116,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         return note;
     }
 
-    private InputFile getInputFile(NoteFile file) throws TelegramApiException {
+    private InputFile getInputFile(FlashBackFile file) throws TelegramApiException {
         InputFile inputFile = null;
         if(file.getTelegramFileId() != null) {
             inputFile = new InputFile(file.getTelegramFileId());
@@ -131,9 +131,9 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         return inputFile;
     }
 
-    private String sendVisualMedia(FlashBackUser user, NoteFile file) throws TelegramApiException {
+    private String sendVisualMedia(FlashBackUser user, FlashBackFile file) throws TelegramApiException {
         InputFile inputFile = getInputFile(file);
-        if(file.getFileType() == NoteFile.Type.PHOTO) {
+        if(file.getFileType() == FlashBackFile.Type.PHOTO) {
             SendPhoto sendPhoto = SendPhoto
                 .builder()
                 .chatId(user.getTelegramChatId())
@@ -151,7 +151,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         }
     }
 
-    private String sendAudioMedia(FlashBackUser user, NoteFile file) throws TelegramApiException {
+    private String sendAudioMedia(FlashBackUser user, FlashBackFile file) throws TelegramApiException {
         InputFile inputFile = getInputFile(file);
 
         SendAudio sendAudio = SendAudio
@@ -162,7 +162,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         return client.execute(sendAudio).getAudio().getFileId();
     }
 
-    private String sendDocumentMedia(FlashBackUser user, NoteFile file) throws TelegramApiException {
+    private String sendDocumentMedia(FlashBackUser user, FlashBackFile file) throws TelegramApiException {
         InputFile inputFile = getInputFile(file);
 
         SendDocument sendDocument = SendDocument
@@ -187,7 +187,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                     ? uploadDir.resolve(file.getHash()).resolve(file.getFileName())
                     : null;
 
-                if(file.getFileType() == NoteFile.Type.PHOTO) {
+                if(file.getFileType() == FlashBackFile.Type.PHOTO) {
                     InputMediaPhoto media = telegramFileId == null
                         ? new InputMediaPhoto(new java.io.File(filePath.toString()), file.getFileName())
                         : new InputMediaPhoto(telegramFileId);
@@ -370,35 +370,35 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         }
     }
 
-    private NoteFile getFileFromMessage(Message message) {
-        NoteFile file = new NoteFile();
+    private FlashBackFile getFileFromMessage(Message message) {
+        FlashBackFile file = new FlashBackFile();
         if(message.hasPhoto()) {
             PhotoSize photo = message.getPhoto().getFirst();
             System.out.println("Processed photo: " + photo.getFileId());
             file.setTelegramFileId(photo.getFileId());
             file.setSize(photo.getFileSize().longValue());
-            file.setFileType(NoteFile.Type.PHOTO);
+            file.setFileType(FlashBackFile.Type.PHOTO);
         }
         else if(message.hasAudio()) {
             Audio audio = message.getAudio();
             file.setTelegramFileId(audio.getFileId());
             file.setExtension(FilenameUtils.getExtension(audio.getFileName()));
             file.setSize(audio.getFileSize());
-            file.setFileType(NoteFile.Type.AUDIO);
+            file.setFileType(FlashBackFile.Type.AUDIO);
         }
         else if(message.hasVideo()) {
             Video video = message.getVideo();
             file.setTelegramFileId(video.getFileId());
             file.setExtension(FilenameUtils.getExtension(video.getFileName()));
             file.setSize(video.getFileSize());
-            file.setFileType(NoteFile.Type.VIDEO);
+            file.setFileType(FlashBackFile.Type.VIDEO);
         }
         else if(message.hasDocument()) {
             Document doc = message.getDocument();
             file.setTelegramFileId(doc.getFileId());
             file.setExtension(FilenameUtils.getExtension(doc.getFileName()));
             file.setSize(doc.getFileSize());
-            file.setFileType(NoteFile.Type.DOCUMENT);
+            file.setFileType(FlashBackFile.Type.DOCUMENT);
         }
         return file;
     }
@@ -457,7 +457,7 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         FlashBackUser user = Database.getUserByChatId(message.getChatId());
         FlashBackNote note = new FlashBackNote();
 
-        NoteFile file = getFileFromMessage(message);
+        FlashBackFile file = getFileFromMessage(message);
         note.getFiles().add(file);
 
         note.setNote(message.getCaption());
@@ -562,9 +562,9 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
 
     private class DownloadTask implements Runnable {
         private final Integer noteId;
-        private final List<NoteFile> files;
+        private final List<FlashBackFile> files;
 
-        public DownloadTask(Integer noteId, List<NoteFile> files) {
+        public DownloadTask(Integer noteId, List<FlashBackFile> files) {
             this.noteId = noteId;
             this.files = files;
         }

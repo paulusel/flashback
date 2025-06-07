@@ -11,7 +11,7 @@ import org.flashback.exceptions.NoteNotFound;
 import org.flashback.exceptions.UserNotFoundException;
 import org.flashback.helpers.Config;
 import org.flashback.types.FlashBackUser;
-import org.flashback.types.NoteFile;
+import org.flashback.types.FlashBackFile;
 import org.flashback.types.FlashBackNote;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -197,9 +197,9 @@ public class Database {
         stmnt.setInt(1, note.getNoteId());
         var result = stmnt.executeQuery();
         while(result.next()) {
-            NoteFile file = new NoteFile();
+            FlashBackFile file = new FlashBackFile();
             file.setHash(result.getString(1));
-            file.setFileType(NoteFile.Type.typeOf(result.getInt(2)));
+            file.setFileType(FlashBackFile.Type.typeOf(result.getInt(2)));
             file.setExtension(result.getString(3));
             file.setSize(result.getLong(4));
             file.setTelegramFileId(result.getString(5));
@@ -364,7 +364,7 @@ public class Database {
         return notes;
     }
 
-    public static List<NoteFile> getNoteFiles(Integer noteId) throws FlashbackException {
+    public static List<FlashBackFile> getNoteFiles(Integer noteId) throws FlashbackException {
         String sql = "SELECT files.file_hash, type, extension, size, telegram_file_id FROM files JOIN note_files "
             + " USING (file_hash) WHERE note_files.note_id = ?";
         try(var conn = ds.getConnection();
@@ -372,11 +372,11 @@ public class Database {
             stmnt.setInt(1, noteId);
             var result = stmnt.executeQuery();
 
-            List<NoteFile> files = new ArrayList<>();
+            List<FlashBackFile> files = new ArrayList<>();
             while(result.next()) {
-                NoteFile file = new NoteFile();
+                FlashBackFile file = new FlashBackFile();
                 file.setHash(result.getString(1));
-                file.setFileType(NoteFile.Type.typeOf(result.getInt(2)));
+                file.setFileType(FlashBackFile.Type.typeOf(result.getInt(2)));
                 file.setExtension(result.getString(3));
                 file.setSize(result.getLong(4));
                 file.setTelegramFileId(result.getString(5));
@@ -391,7 +391,7 @@ public class Database {
         }
     }
 
-    public static void saveFiles(List<NoteFile> files) throws FlashbackException {
+    public static void saveFiles(List<FlashBackFile> files) throws FlashbackException {
         String sql = "INSERT INTO files (file_hash, type, extension, size, telegram_file_id) "
             + " VALUES (?, ?, ?, ?, ?) ON CONFlICT DO NOTHING";
         try(var conn = ds.getConnection();
@@ -412,7 +412,7 @@ public class Database {
         }
     }
 
-    public static void addNoteFiles(Integer noteId, List<NoteFile> files) throws FlashbackException {
+    public static void addNoteFiles(Integer noteId, List<FlashBackFile> files) throws FlashbackException {
         String sql ="INSERT INTO note_files (note_id, file_hash) VALUES (?, ?) ON CONFlICT DO NOTHING";
         try (var conn = ds.getConnection();
             var stmnt = conn.prepareStatement(sql)) {
@@ -429,7 +429,7 @@ public class Database {
         }
     }
 
-    public static void saveTelegramFileIds(List<NoteFile> files) throws FlashbackException {
+    public static void saveTelegramFileIds(List<FlashBackFile> files) throws FlashbackException {
         String sql ="UPDATE files SET telegram_file_id = ? WHERE file_hash = ?";
         try (var conn = ds.getConnection();
             var stmnt = conn.prepareStatement(sql)) {

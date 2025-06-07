@@ -1,6 +1,6 @@
 package org.flashback.types;
 
-public class NoteFile {
+public class FlashBackFile {
     public enum Type { 
         PHOTO(1),
         VIDEO(2),

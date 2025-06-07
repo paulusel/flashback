@@ -3,7 +3,7 @@ package org.flashback.telegram;
 import java.util.List;
 import java.util.ArrayList;
 
-import org.flashback.types.NoteFile;
+import org.flashback.types.FlashBackFile;
 
 public class NoteFileCategory {
     public enum Category {
@@ -12,7 +12,7 @@ public class NoteFileCategory {
         DOCUMENT
     }
 
-    public final List<NoteFile> files = new ArrayList<>();
+    public final List<FlashBackFile> files = new ArrayList<>();
     public final Category category;
 
     public NoteFileCategory(Category category) {

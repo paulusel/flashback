@@ -13,7 +13,7 @@ import org.flashback.types.RequestResponsePair;
 import org.flashback.types.ServerResponse;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.MessageResponse;
-import org.flashback.types.NoteFile;
+import org.flashback.types.FlashBackFile;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -55,7 +55,7 @@ public class GenericHandler {
         }
     }
 
-    public static void sendFile(RequestResponsePair exchange, NoteFile nFile) throws IOException {
+    public static void sendFile(RequestResponsePair exchange, FlashBackFile nFile) throws IOException {
         var file = Path.of(Config.getValue("uploads_dir")).resolve(nFile.getHash()).toFile();
         try(FileInputStream in = new FileInputStream(file)){
             exchange.response.setStatus(HttpStatus.OK_200);
