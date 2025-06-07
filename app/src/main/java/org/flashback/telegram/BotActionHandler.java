@@ -444,10 +444,21 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             // add tag to existing note
             String[] tagTokens = text.substring(4).split(" ");
             note.getTags().addAll(Arrays.asList(tagTokens));
+            Database.updateNote(user.getUserId(), note);
         }
-        else { note.setNote(text); }
+        else if(text.startsWith("untag ") && note.getNoteId() != null) {
+            try {
+                Database.removeNoteTag(user.getUserId(), note.getNoteId(), text.substring(6));
+            }
+            catch(NoteNotFound e) {
+                sendPlainMessage(user.getTelegramChatId(), "no such tag exists for the note");
+            }
+        }
+        else {
+            note.setNote(text);
+            Database.addOrUpdateNote(user.getUserId(), note);
+        }
 
-        Database.addOrUpdateNote(user.getUserId(), note);
         note = Database.getNote(user.getUserId(), note.getNoteId());
         sendNote(user, note);
     }

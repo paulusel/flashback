@@ -1,6 +1,7 @@
 package org.flashback.server;
 
 import org.flashback.server.handlers.*;
+
 import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 
@@ -27,8 +28,10 @@ public class RootDispatcher implements Runnable {
         handlers.put("modnote", UpdateNoteHandler::handle);
         handlers.put("rmnote", DeleteNoteHandler::handle);
         handlers.put("download", FileDownloadHandler::handle);
-        handlers.put("getfeed", FileDownloadHandler::handle);
+        handlers.put("getfeed", GetFeedHandler::handle);
         handlers.put("search", SearchHandler::handle);
+        handlers.put("rmfile", RemoveNoteFileHandler::handle);
+        handlers.put("rmtag", RemoveNoteTagHandler::handle);
     }
 
     @Override

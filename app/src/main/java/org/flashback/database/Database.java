@@ -2,6 +2,7 @@ package org.flashback.database;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -393,7 +394,36 @@ public class Database {
 
     public static List<FlashBackNote> getFeed(Integer userId, Long timestamp) throws FlashbackException {
         List<FlashBackNote> notes = new ArrayList<>();
-        return notes;
+        String sql = "SELECT note_id, note, modified, created FROM notes " +
+            "WHERE owner_id = ? AND modified < ? " +
+            "ORDER BY modified ASC LIMIT 10";;
+
+        try (var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)){
+
+            stmnt.setInt(1, userId);
+            stmnt.setTimestamp(2, new Timestamp(timestamp * 1000));
+
+            try(var result = stmnt.executeQuery()) {
+                while(result.next()) {
+                    FlashBackNote note = new FlashBackNote();
+                    note.setNoteId(result.getInt(1));
+                    note.setNote(result.getString(2));
+                    note.setModified(result.getTimestamp(3));
+                    note.setCreated(result.getTimestamp(4));
+
+                    loadNoteFiles(conn, note);
+                    loadNoteTags(conn, note);
+
+                    notes.add(note);
+                }
+            }
+            return notes;
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 
     public static List<FlashBackFile> getNoteFiles(Integer noteId) throws FlashbackException {
@@ -478,5 +508,61 @@ public class Database {
             throw new FlashbackException();
         }
 
+    }
+
+    public static void removeNoteFile(Integer userId, Integer noteId, String hash) throws FlashbackException {
+        String sql = "DELETE FROM note_files " +
+                    "WHERE note_id = ? " +
+                    "AND file_hash = ? " +
+                    "AND EXISTS (" +
+                    "    SELECT 1 " +
+                    "    FROM notes " +
+                    "    WHERE note_id = note_files.note_id " +
+                    "    AND owner_id = ?" +
+                    ")";
+
+        try (var conn = ds.getConnection();
+            var stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, noteId);
+            stmt.setString(2, hash);
+            stmt.setInt(3, userId);
+
+            if(stmt.executeUpdate() == 0) {
+                throw new NoteNotFound();
+            }
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
+    }
+
+    public static void removeNoteTag(Integer userId, Integer noteId, String tag) throws FlashbackException {
+        String sql = "DELETE FROM note_tags " +
+                    "WHERE note_id = ? " +
+                    "AND tag = ? " +
+                    "AND EXISTS (" +
+                    "    SELECT 1 " +
+                    "    FROM notes " +
+                    "    WHERE note_id = note_tags.note_id " +
+                    "    AND owner_id = ?" +
+                    ")";
+
+        try (var conn = ds.getConnection();
+            var stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, noteId);
+            stmt.setString(2, tag);
+            stmt.setInt(3, userId);
+
+            if(stmt.executeUpdate() == 0) {
+                throw new NoteNotFound();
+            }
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            throw new FlashbackException();
+        }
     }
 }
