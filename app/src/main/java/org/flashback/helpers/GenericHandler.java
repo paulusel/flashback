@@ -30,7 +30,6 @@ public class GenericHandler {
     }
 
     public static void handleException(RequestResponsePair exchange, FlashbackException e) {
-        exchange.response.reset();
         ServerResponse response = new MessageResponse(false, e.getStatusCode(), e.getMessage());
         sendResponse(response, exchange);
     }

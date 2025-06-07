@@ -22,6 +22,18 @@ public class FlashbackHttpServlet extends HttpServlet {
 
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        // CORS Headers
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+
+        if (req.getMethod().equalsIgnoreCase("OPTIONS")) {
+            res.setHeader("Content-Type", "application/json");
+            res.setStatus(HttpServletResponse.SC_OK);
+            return;
+        }
+
         var exchange = new RequestResponsePair(req, res);
         if(!queue.offer(exchange)) {
             GenericHandler.sendResponse(
