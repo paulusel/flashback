@@ -27,7 +27,7 @@ public class RootDispatcher implements Runnable {
         handlers.put("getnote", GetNoteHandler::handle);
         handlers.put("modnote", UpdateNoteHandler::handle);
         handlers.put("rmnote", DeleteNoteHandler::handle);
-        handlers.put("download", FileDownloadHandler::handle);
+        handlers.put("file", FileDownloadHandler::handle);
         handlers.put("getfeed", GetFeedHandler::handle);
         handlers.put("search", SearchHandler::handle);
         handlers.put("rmfile", RemoveNoteFileHandler::handle);
@@ -39,16 +39,20 @@ public class RootDispatcher implements Runnable {
         while (!Thread.interrupted()) {
             try( RequestResponsePair exchange = queue.take()) {
 
-                if(!exchange.request.getMethod().equals("POST")) {
-                    GenericHandler.handleException(exchange, new FlashbackException(HttpStatus.METHOD_NOT_ALLOWED_405, "expected POST request"));
-                    continue;
-                }
+                String requestURI = exchange.request.getRequestURI().substring(1);
+                int pos = requestURI.indexOf('/');
+                String path = pos == -1 ? requestURI : requestURI.substring(0, pos);
 
-                String path = exchange.request.getRequestURI().substring(1);
                 var handler = handlers.get(path);
 
                 if(handler == null) {
-                    GenericHandler.handleException(exchange, new FlashbackException(HttpStatus.NOT_FOUND_404, "api method not found"));
+                    GenericHandler.handleException(
+                        exchange,
+                        new FlashbackException(
+                            HttpStatus.NOT_FOUND_404,
+                            "api method not found"
+                        )
+                    );
                     continue;
                 }
 

@@ -17,7 +17,7 @@ public class RemoveNoteTagHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
             Integer userId = Authenticator.authenticate(exchange.request);
-            String json = GenericHandler.requestBodyString(exchange.request);
+            String json = GenericHandler.getRequestBodyString(exchange.request);
             NoteParameter parameter = Json.deserialize(json, NoteParameter.class);
 
             if(parameter.getNoteId() == null || parameter.getValue() == null) {

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 
 import org.eclipse.jetty.http.HttpStatus;
+import org.flashback.exceptions.FlashbackException;
 import org.flashback.helpers.GenericHandler;
 import org.flashback.types.MessageResponse;
 import org.flashback.types.RequestResponsePair;
@@ -35,6 +36,21 @@ public class FlashbackHttpServlet extends HttpServlet {
         }
 
         var exchange = new RequestResponsePair(req, res);
+
+        if((!req.getMethod().equalsIgnoreCase("POST") && !req.getMethod().equalsIgnoreCase("GET")) ||
+                (req.getMethod().equalsIgnoreCase("POST") && req.getRequestURI().startsWith("/file")) ||
+                (req.getMethod().equalsIgnoreCase("GET") && !req.getRequestURI().startsWith("/file")))
+        {
+            GenericHandler.handleException(
+                exchange,
+                new FlashbackException(
+                    HttpStatus.METHOD_NOT_ALLOWED_405,
+                    "method not allowed: expect GET for 'file' and POST for everything else"
+                )
+            );
+            return;
+        }
+
         if(!queue.offer(exchange)) {
             GenericHandler.sendResponse(
                 new MessageResponse(false, HttpStatus.SERVICE_UNAVAILABLE_503, "Server Busy"),

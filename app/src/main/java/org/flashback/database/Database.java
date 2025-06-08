@@ -233,31 +233,49 @@ public class Database {
         }
     }
 
-    /*
-    public static NoteFile getFile(Integer userId, String fileId) throws FlashbackException {
-        try(var conn = ds.getConnection()) {
-            var stmnt = conn.prepareStatement("SELECT telegram_file_id, original_name, size, mime_type " +
-                " FROM file_owners JOIN files USING (file_id) WHERE user_id = ? AND file_id = ?");
-            stmnt.setLong(1, userId);
-            stmnt.setString(2, fileId);
-            var result = stmnt.executeQuery();
+    public static FlashBackFile getFile(Integer userId, String fileHash) throws FlashbackException {
+        String sql = "SELECT f.type, f.extension, f.size, f.telegram_file_id " +
+            "FROM flashback.files f " +
+            "WHERE f.file_hash = ? " +
+            "AND EXISTS ( " +
+            "    SELECT 1 " +
+            "    FROM flashback.note_files nf " +
+            "    JOIN flashback.notes n ON nf.note_id = n.note_id " +
+            "    WHERE nf.file_hash = f.file_hash " +
+            "    AND n.owner_id = ? " +
+            ")";
 
-            if(!result.next()) {
-                throw new FlashbackException(HttpStatus.NOT_FOUND_404, "file not found");
+        try(var conn = ds.getConnection();
+            var stmnt = conn.prepareStatement(sql)) {
+
+            stmnt.setString(1, fileHash);
+            stmnt.setLong(2, userId);
+
+            try(var result = stmnt.executeQuery()) {
+                if(!result.next()) {
+                    throw new FlashbackException(HttpStatus.NOT_FOUND_404, "file not found");
+                }
+
+                FlashBackFile file = new FlashBackFile();
+                file.setHash(fileHash);
+                file.setFileType(FlashBackFile.Type.typeOf(result.getInt(1)));
+                file.setExtension(result.getString(2));
+                file.setSize(result.getLong(3));
+                file.setTelegramFileId(result.getString(4));
+
+                System.out.println("Got file: " + fileHash);
+                System.out.println("extension: " + file.getExtension());
+                System.out.println("type: " + file.getFileType());
+
+                return file;
             }
 
-            NoteFile file = new NoteFile();
-            file.setHash(fileId);
-            file.setTelegramFileId(result.getString(1));
-            file.setSize(result.getLong(3));
-            return file;
         }
         catch(SQLException e) {
             e.printStackTrace();
             throw new FlashbackException();
         }
     }
-    */
 
     public static FlashBackUser getUserByChatId(Long chatId) throws FlashbackException {
         try(var conn = ds.getConnection()) {

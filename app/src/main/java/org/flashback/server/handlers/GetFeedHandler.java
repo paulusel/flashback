@@ -15,7 +15,7 @@ public class GetFeedHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
             Integer userId = Authenticator.authenticate(exchange.request);
-            String json = GenericHandler.requestBodyString(exchange.request);
+            String json = GenericHandler.getRequestBodyString(exchange.request);
             long timestamp = Json.deserialize(json, long.class);
 
             List<FlashBackNote> notes = Database.getFeed(userId, timestamp);

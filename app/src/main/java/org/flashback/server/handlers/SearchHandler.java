@@ -16,7 +16,7 @@ public class SearchHandler{
         try {
             Integer userId = Authenticator.authenticate(exchange.request);
             GenericHandler.checkJsonBody(exchange.request);
-            String json = GenericHandler.requestBodyString(exchange.request);
+            String json = GenericHandler.getRequestBodyString(exchange.request);
             String keyword = Json.deserialize(json, String.class);
             List<FlashBackNote> notes = Database.searchNotes(userId, keyword);
             GenericHandler.sendResponse(new MultipleNoteResponse(true, HttpStatus.OK_200, notes), exchange);

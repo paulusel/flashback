@@ -13,7 +13,7 @@ public class SignupHandler {
     public static void handle(RequestResponsePair exchange) {
         try {
             GenericHandler.checkJsonBody(exchange.request);
-            String json = GenericHandler.requestBodyString(exchange.request);
+            String json = GenericHandler.getRequestBodyString(exchange.request);
             FlashBackUser user = Json.deserialize(json, FlashBackUser.class);
             Database.addNewUser(user);
             String token = Authenticator.generateToken(user.getUserId());
