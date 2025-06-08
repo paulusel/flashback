@@ -15,8 +15,11 @@ public class SignupHandler {
             GenericHandler.checkJsonBody(exchange.request);
             String json = GenericHandler.getRequestBodyString(exchange.request);
             FlashBackUser user = Json.deserialize(json, FlashBackUser.class);
+
             Database.addNewUser(user);
             String token = Authenticator.generateToken(user.getUserId());
+            exchange.response.addCookie(GenericHandler.makeAuthCookie(token, "auth_token"));
+
             AuthResponse response = new AuthResponse(true, HttpStatus.CREATED_201, token, user);
             GenericHandler.sendResponse(response, exchange);
         }

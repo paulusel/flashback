@@ -17,6 +17,7 @@ import org.flashback.types.ServerResponse;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.types.MessageResponse;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class GenericHandler {
@@ -52,6 +53,13 @@ public class GenericHandler {
         catch(IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static Cookie makeAuthCookie(String token, String name) {
+        Cookie cookie = new Cookie(name, token);
+        cookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
+        cookie.setPath("/");
+        return cookie;
     }
 
     public static void sendFile(RequestResponsePair exchange, Path filePath, boolean download) throws IOException {

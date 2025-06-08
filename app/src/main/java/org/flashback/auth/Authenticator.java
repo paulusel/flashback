@@ -4,19 +4,12 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Arrays;
 
-import javax.crypto.*;
-import javax.crypto.spec.*;
-import java.nio.*;
-import java.util.*;
-
-
 import org.flashback.helpers.Config;
 import org.flashback.exceptions.FlashbackException;
 import org.flashback.exceptions.VerificationException;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Cookie;
 
@@ -28,8 +21,6 @@ import java.nio.file.Paths;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.security.*;
-
-
 
 public class Authenticator {
 

@@ -263,10 +263,6 @@ public class Database {
                 file.setSize(result.getLong(3));
                 file.setTelegramFileId(result.getString(4));
 
-                System.out.println("Got file: " + fileHash);
-                System.out.println("extension: " + file.getExtension());
-                System.out.println("type: " + file.getFileType());
-
                 return file;
             }
 
