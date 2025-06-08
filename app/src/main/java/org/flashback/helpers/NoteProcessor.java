@@ -197,16 +197,19 @@ public class NoteProcessor {
 
                 for(FlashBackFile file: files) {
                     Path src = tempDir.resolve(file.getFileName());
-                    Path dest_dir = destDir.resolve(file.getHash());
+                    Path outpuDir = destDir.resolve(file.getHash());
 
-                    try { Files.createDirectory(dest_dir); }
+                    try { Files.createDirectory(outpuDir); }
                     catch(FileAlreadyExistsException e) { continue; }
 
-                    Path dest = dest_dir.resolve(file.getFileName());
-                    Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
+                    Path outputFile = outpuDir.resolve(file.getFileName());
+                    Files.move(src, outputFile, StandardCopyOption.REPLACE_EXISTING);
 
                     if(file.getFileType() == FlashBackFile.Type.VIDEO) {
-                        ffmpegProcessor.execute(() ->  ffmpegProcessVideo(dest));
+                        ffmpegProcessor.execute(() ->  ffmpegProcessVideo(outputFile));
+                    }
+                    else if(file.getFileType() == FlashBackFile.Type.AUDIO) {
+                        ffmpegProcessor.execute(() ->  ffmpegProcessAudio(outputFile));
                     }
                 }
             }
@@ -220,7 +223,18 @@ public class NoteProcessor {
             String filename = video_path.toString();
             String output_path = FilenameUtils.getFullPathNoEndSeparator(filename);
 
-            List<String> command = Arrays.asList(
+            // FFmpeg commandline to generate thumbnail
+            List<String> thumbnailCommand = Arrays.asList(
+                "ffmpeg", "-i", filename,
+                "-vf", "thumbnail",
+                "-frames:v", "1",
+                "-q:v", "2",
+                "-y",
+                output_path + "/thumbnail.jpg"
+            );
+
+            // FFmpeg commandline to generate hls segments
+            List<String> hlsCommand = Arrays.asList(
                 "ffmpeg", "-i", filename,
                 "-c:v", "libx264",
                 "-crf", "23",
@@ -241,13 +255,57 @@ public class NoteProcessor {
                 output_path + "/playlist.m3u8"
             );
 
+            // Generate thumbnail
+            ProcessBuilder pb = new ProcessBuilder(thumbnailCommand);
+            Process thumbnailProcess = pb.start();
+
+            int exitCode = thumbnailProcess.waitFor();
+            if(exitCode != 0) {
+                System.err.println("Failed to generate thumbnail for: [" + video_path + "]");
+            }
+
+            // Segment the video
+            pb = new ProcessBuilder(hlsCommand);
+            Process process = pb.start();
+
+            exitCode = process.waitFor();
+            if(exitCode != 0) {
+                System.err.println("Failed to generate thumbnail for: [" + video_path + "]");
+            }
+        }
+        catch(Exception e) {
+            System.err.println("postProcessing with ffmpeg failed");
+            e.printStackTrace();
+        }
+    }
+
+    private static void ffmpegProcessAudio(Path audio_path) {
+        try {
+            String filename = audio_path.toString();
+            String output_path = FilenameUtils.getFullPathNoEndSeparator(filename);
+
+            // FFmpeg commandline to segment audio to hls segments
+            List<String> command = Arrays.asList(
+                "ffmpeg", "-i", filename,
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-ac", "2",
+                "-f", "hls",
+                "-hls_time", "6",
+                "-hls_list_size", "0",
+                "-hls_playlist_type", "vod",
+                "-hls_segment_filename", output_path + "/%d.ts",
+                output_path + "/playlist.m3u8"
+            );
+
             ProcessBuilder pb = new ProcessBuilder(command);
             Process process = pb.start();
+
             int exitCode = process.waitFor();
             if(exitCode != 0) throw new Exception();
         }
         catch(Exception e) {
-            System.err.println("postProcessing with ffmpeg failed");
+            System.err.println("postProcessing audio with ffmpeg failed");
             e.printStackTrace();
         }
     }
