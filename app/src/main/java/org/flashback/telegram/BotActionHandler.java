@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -139,7 +140,13 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
                 .chatId(user.getTelegramChatId())
                 .photo(inputFile)
                 .build();
-            return client.execute(sendPhoto).getPhoto().getFirst().getFileId();
+
+            return client.execute(sendPhoto)
+                .getPhoto()
+                .stream()
+                .max(Comparator.comparingInt(PhotoSize::getFileSize))
+                .get()
+                .getFileId();
         }
         else {
             SendVideo sendVideo = SendVideo
@@ -159,7 +166,14 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
             .chatId(user.getTelegramChatId())
             .audio(inputFile)
             .build();
-        return client.execute(sendAudio).getAudio().getFileId();
+
+        Message reply = client.execute(sendAudio);
+        String fielId = null;
+
+        if(reply.hasAudio()) {
+            fielId = reply.getAudio().getFileId();
+        }
+        return fielId;
     }
 
     private String sendDocumentMedia(FlashBackUser user, FlashBackFile file) throws TelegramApiException {
@@ -232,7 +246,14 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
         List<String> fileIds = new ArrayList<>();
 
         for(Message message : messages) {
-            if(message.hasPhoto()) { fileIds.add(message.getPhoto().getFirst().getFileId()); }
+            if(message.hasPhoto()) {
+                fileIds.add(message.getPhoto()
+                        .stream()
+                        .max(Comparator.comparingInt(PhotoSize::getFileSize))
+                        .get()
+                        .getFileId()
+                );
+            }
             else if(message.hasVideo()) { fileIds.add(message.getVideo().getFileId()); }
             else if(message.hasAudio()) { fileIds.add(message.getAudio().getFileId()); }
             else if(message.hasDocument()) { fileIds.add(message.getDocument().getFileId()); }
@@ -373,8 +394,11 @@ public class BotActionHandler implements LongPollingUpdateConsumer{
     private FlashBackFile getFileFromMessage(Message message) {
         FlashBackFile file = new FlashBackFile();
         if(message.hasPhoto()) {
-            PhotoSize photo = message.getPhoto().getFirst();
-            System.out.println("Processed photo: " + photo.getFileId());
+            PhotoSize photo = message.getPhoto()
+                .stream()
+                .max(Comparator.comparingInt(PhotoSize::getFileSize))
+                .get();
+
             file.setTelegramFileId(photo.getFileId());
             file.setSize(photo.getFileSize().longValue());
             file.setFileType(FlashBackFile.Type.PHOTO);
