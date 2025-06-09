@@ -105,7 +105,7 @@ public class Authenticator {
         if(cookies == null) return "";
 
         return Arrays.stream(cookies)
-                .filter(cookie -> cookie.getName().equals("auth_token"))
+                .filter(cookie -> cookie.getName().equals("token"))
                 .findFirst()
                 .map(Cookie::getValue)
                 .orElse("");

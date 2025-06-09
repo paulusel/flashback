@@ -24,7 +24,7 @@ public class FlashbackHttpServlet extends HttpServlet {
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         // CORS Headers
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
         res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -35,8 +35,9 @@ public class FlashbackHttpServlet extends HttpServlet {
             return;
         }
 
-        var exchange = new RequestResponsePair(req, res);
 
+
+        var exchange = new RequestResponsePair(req, res);
         if((!req.getMethod().equalsIgnoreCase("POST") && !req.getMethod().equalsIgnoreCase("GET")) ||
                 (req.getMethod().equalsIgnoreCase("POST") && req.getRequestURI().startsWith("/file")) ||
                 (req.getMethod().equalsIgnoreCase("GET") && !req.getRequestURI().startsWith("/file")))
@@ -51,13 +52,12 @@ public class FlashbackHttpServlet extends HttpServlet {
             return;
         }
 
+        req.startAsync().setTimeout(30000); // 30s timeout
         if(!queue.offer(exchange)) {
             GenericHandler.sendResponse(
                 new MessageResponse(false, HttpStatus.SERVICE_UNAVAILABLE_503, "Server Busy"),
                 exchange);
-            return;
+            req.getAsyncContext().complete();
         }
-
-        req.startAsync().setTimeout(30000); // 30s timeout
     }
 }

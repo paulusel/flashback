@@ -23,7 +23,7 @@ public class LoginHandler {
 
             user = Database.authenticate(user);
             String token = Authenticator.generateToken(user.getUserId());
-            exchange.response.addCookie(GenericHandler.makeAuthCookie(token, "auth_token"));
+            exchange.response.addCookie(GenericHandler.makeAuthCookie(token, "token"));
 
             AuthResponse response = new AuthResponse(true, HttpStatus.OK_200, token, user);
             GenericHandler.sendResponse(response, exchange);

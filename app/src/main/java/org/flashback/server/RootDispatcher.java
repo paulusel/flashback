@@ -37,8 +37,7 @@ public class RootDispatcher implements Runnable {
     @Override
     public void run(){
         while (!Thread.interrupted()) {
-            try( RequestResponsePair exchange = queue.take()) {
-
+            try(RequestResponsePair exchange = queue.take()) {
                 String requestURI = exchange.request.getRequestURI().substring(1);
                 int pos = requestURI.indexOf('/');
                 String path = pos == -1 ? requestURI : requestURI.substring(0, pos);
