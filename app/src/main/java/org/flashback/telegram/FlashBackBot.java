@@ -48,7 +48,9 @@ public class FlashBackBot {
                 noteSender.execute(() -> {
                     try {
                         FlashBackNote not = botActionHandler.sendNote(user, note);
-                        Database.saveTelegramFileIds(not.getFiles());
+                        if(!not.getFiles().isEmpty()) {
+                            Database.saveTelegramFileIds(not.getFiles());
+                        }
                     }
                     catch(Exception e) {
                         e.printStackTrace();
@@ -58,7 +60,6 @@ public class FlashBackBot {
         }
         catch(FlashbackException e){ 
             e.printStackTrace();
-            return;
         }
     }
 

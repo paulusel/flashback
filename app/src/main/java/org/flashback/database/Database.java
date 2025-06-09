@@ -55,8 +55,8 @@ public class Database {
             var usr = new FlashBackUser();
             usr.setUserId(userId);
             usr.setUserName(result.getString(1));
-            usr.setTelegramUserId(result.getLong(2));
-            usr.setTelegramChatId(result.getLong(3));
+            usr.setTelegramUserId(result.getObject(2, Long.class));
+            usr.setTelegramChatId(result.getObject(3, Long.class));
             return usr;
 
         }
@@ -82,9 +82,9 @@ public class Database {
                 throw new FlashbackException(HttpStatus.UNAUTHORIZED_401, "incorrect username or password");
             }
 
-            user.setUserId(result.getInt(2));
-            user.setTelegramUserId(result.getLong(3));
-            user.setTelegramChatId(result.getLong(4));
+            user.setUserId(result.getObject(2, Integer.class));
+            user.setTelegramUserId(result.getObject(3, Long.class));
+            user.setTelegramChatId(result.getObject(4, Long.class));
             user.setPassword(null);
 
             return user;
@@ -123,7 +123,7 @@ public class Database {
             stmnt.setString(2, passwordHash);
             var result = stmnt.executeQuery();
             result.next();
-            user.setUserId(result.getInt(1));
+            user.setUserId(result.getObject(1, Integer.class));
             user.setPassword(null);
             return user;
         }
@@ -141,7 +141,7 @@ public class Database {
 
             var result = noteInsertStmnt.executeQuery();
             result.next();
-            note.setNoteId(result.getInt(1));
+            note.setNoteId(result.getObject(1, Integer.class));
 
             if(note.getTags() != null){
                 insertNoteTags(conn, note.getNoteId(), note.getTags());
@@ -200,9 +200,9 @@ public class Database {
         while(result.next()) {
             FlashBackFile file = new FlashBackFile();
             file.setHash(result.getString(1));
-            file.setFileType(FlashBackFile.Type.typeOf(result.getInt(2)));
+            file.setFileType(FlashBackFile.Type.typeOf(result.getObject(2, Integer.class)));
             file.setExtension(result.getString(3));
-            file.setSize(result.getLong(4));
+            file.setSize(result.getObject(4, Long.class));
             file.setTelegramFileId(result.getString(5));
             note.getFiles().addLast(file);
         }
@@ -258,9 +258,9 @@ public class Database {
 
                 FlashBackFile file = new FlashBackFile();
                 file.setHash(fileHash);
-                file.setFileType(FlashBackFile.Type.typeOf(result.getInt(1)));
+                file.setFileType(FlashBackFile.Type.typeOf(result.getObject(1, Integer.class)));
                 file.setExtension(result.getString(2));
-                file.setSize(result.getLong(3));
+                file.setSize(result.getObject(3, Long.class));
                 file.setTelegramFileId(result.getString(4));
 
                 return file;
@@ -284,9 +284,9 @@ public class Database {
             }
             FlashBackUser user = new FlashBackUser();
             user.setTelegramChatId(chatId);
-            user.setUserId(result.getInt(1));
+            user.setUserId(result.getObject(1, Integer.class));
             user.setUserName(result.getString(2));
-            user.setTelegramUserId(result.getLong(3));
+            user.setTelegramUserId(result.getObject(3, Long.class));
             return user;
         }
         catch(SQLException e){
@@ -386,7 +386,7 @@ public class Database {
             try (var result = stmnt.executeQuery()) {
                 while (result.next()) {
                     FlashBackNote note = new FlashBackNote();
-                    note.setNoteId(result.getInt(1));
+                    note.setNoteId(result.getObject(1, Integer.class));
                     note.setNote(result.getString(2));
                     note.setModified(result.getTimestamp(3));
                     note.setCreated(result.getTimestamp(4));
@@ -421,7 +421,7 @@ public class Database {
             try(var result = stmnt.executeQuery()) {
                 while(result.next()) {
                     FlashBackNote note = new FlashBackNote();
-                    note.setNoteId(result.getInt(1));
+                    note.setNoteId(result.getObject(1, Integer.class));
                     note.setNote(result.getString(2));
                     note.setModified(result.getTimestamp(3));
                     note.setCreated(result.getTimestamp(4));
@@ -452,9 +452,9 @@ public class Database {
             while(result.next()) {
                 FlashBackFile file = new FlashBackFile();
                 file.setHash(result.getString(1));
-                file.setFileType(FlashBackFile.Type.typeOf(result.getInt(2)));
+                file.setFileType(FlashBackFile.Type.typeOf(result.getObject(2, Integer.class)));
                 file.setExtension(result.getString(3));
-                file.setSize(result.getLong(4));
+                file.setSize(result.getObject(4, Long.class));
                 file.setTelegramFileId(result.getString(5));
                 files.add(file);
             }
